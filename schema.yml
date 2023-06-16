@@ -1,0 +1,16 @@
+version: 1
+
+definitions:
+  - trigger:
+      table: user
+      operation: insert
+    action:
+      type: http
+      method: post
+      url: http://localhost:3000/users
+# Schema { version: 1, definitions: Definition[] }
+# Definition { trigger: Trigger, action: Action }
+# Trigger { table: string, operation: string }
+# Action { type: string, method: string, url: string }
+# NotificationBody { trigger: Trigger, old: interface{}, new: interface{} }
+
