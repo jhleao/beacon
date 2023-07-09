@@ -1,4 +1,4 @@
-package log
+package blog // beacon log... Yeah I know
 
 import (
 	"go.uber.org/zap"
@@ -6,11 +6,13 @@ import (
 
 var initialized bool
 
-var Info func(msg string, args ...interface{})
-var Warn func(msg string, args ...interface{})
-var Error func(msg string, args ...interface{})
-var Fatal func(msg string, args ...interface{})
-var Debug func(msg string, args ...interface{})
+var noop = func(msg string, args ...interface{}) {}
+
+var Info func(msg string, args ...interface{}) = noop
+var Warn func(msg string, args ...interface{}) = noop
+var Error func(msg string, args ...interface{}) = noop
+var Fatal func(msg string, args ...interface{}) = noop
+var Debug func(msg string, args ...interface{}) = noop
 
 func Init() {
 	if initialized {
