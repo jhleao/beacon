@@ -1,26 +1,14 @@
 package yml
 
 import (
-	"beacon/go/common"
 	"beacon/go/db"
 	"beacon/go/schema"
 	"beacon/go/util"
 	"errors"
+	"fmt"
 
 	"gopkg.in/yaml.v3"
 )
-
-type SchemaYml struct {
-	Triggers []TriggerYml `yaml:"triggers"`
-}
-
-type TriggerYml struct {
-	Schema      string `yaml:"schema"`
-	Table       string `yaml:"table"`
-	Operation   string `yaml:"operation"`
-	TriggerType string `yaml:"type"`
-	Url         string `yaml:"url"`
-}
 
 type YmlSchemaParser struct {
 	db db.Connector
@@ -33,89 +21,86 @@ func NewYmlSchemaParser(db db.Connector) *YmlSchemaParser {
 }
 
 func (h *YmlSchemaParser) ValidateAndParse(rawSchema []byte) (schema.Schema, error) {
-	parsedYml := SchemaYml{}
+	parsed := schema.Schema{}
 
-	err := yaml.Unmarshal(rawSchema, &parsedYml)
+	err := yaml.Unmarshal(rawSchema, &parsed)
 	if err != nil {
 		return schema.Schema{}, errors.New("invalid schema format")
 	}
 
-	err = h.validateSchema(parsedYml)
+	h.backfillSchema(parsed)
+
+	err = h.validateSchema(parsed)
 	if err != nil {
 		return schema.Schema{}, err
 	}
 
-	parsed := h.parseSchema(parsedYml)
-
 	return parsed, nil
 }
 
-func (h *YmlSchemaParser) validateSchema(yml SchemaYml) error {
+func (h *YmlSchemaParser) validateSchema(yml schema.Schema) error {
 	const errPrefix = "schema validation failed: "
 
-	tableNames, err := h.db.GetAllTableNames()
-	if err != nil {
-		return err
+	if yml.Version != 1 {
+		return errors.New(errPrefix + "unsupported version. Supported: '1'")
 	}
 
-	for _, trigger := range yml.Triggers {
-		if !util.MapIncludes(schema.TriggerTypeNames, trigger.TriggerType) {
-			return errors.New(errPrefix + "invalid \"type\" value: " + trigger.TriggerType)
+	if yml.Driver != "postgres" {
+		return errors.New(errPrefix + "unsupported driver. Supported: 'postgres'")
+	}
+
+	for _, definition := range yml.Definitions {
+		if !util.Includes(schema.Operations, schema.IOperation(definition.Trigger.Operation)) {
+			return fmt.Errorf("%s invalid \"operation\" value: %v", errPrefix, definition.Trigger.Operation)
 		}
 
-		if !util.MapIncludes(common.DbOperationNames, trigger.Operation) {
-			return errors.New(errPrefix + "invalid \"operation\" value: " + trigger.Operation)
-		}
-
-		if trigger.Table == "" {
+		if definition.Trigger.Table == "" {
 			return errors.New(errPrefix + "table must be set")
 		}
 
-		if trigger.Schema == "" {
-			return errors.New(errPrefix + "schema must be set")
+		if !util.Includes(schema.ActionTypes, schema.IActionType(definition.Action.Type)) {
+			return fmt.Errorf("%s invalid \"action.type\" value: %v", errPrefix, definition.Action.Type)
 		}
 
-		if trigger.TriggerType == schema.TriggerTypeNames[schema.Http] && trigger.Url == "" {
-			return errors.New(errPrefix + "url must be set for http triggers")
+		if schema.IActionType(definition.Action.Type) == schema.ActionType.Http {
+			if definition.Action.Url == "" {
+				return errors.New(errPrefix + "url must be set for http actions")
+			}
+			if definition.Action.Method == "" {
+				return errors.New(errPrefix + "method must be set for http actions")
+			}
+			if !util.Includes(schema.HttpMethods, schema.IHttpMethod(definition.Action.Method)) {
+				return fmt.Errorf("%s invalid \"action.method\" value: %v", errPrefix, definition.Action.Method)
+			}
 		}
 
-		if !util.Includes(tableNames, trigger.Table) {
-			return errors.New(errPrefix + "table \"" + trigger.Table + "\" does not exist")
+		tableNames, err := h.db.GetTableNamesOnSchema(definition.Trigger.Schema)
+
+		if err != nil {
+			return err
+		}
+
+		if !util.Includes(tableNames, definition.Trigger.Table) {
+			return fmt.Errorf("%s table \"%s\" does not exist on relation %s", errPrefix, definition.Trigger.Table, definition.Trigger.Schema)
 		}
 	}
 
 	return nil
 }
 
-// Parses schema. Can panic in case of invalid schema. Validate before calling this.
-func (h *YmlSchemaParser) parseSchema(yml SchemaYml) schema.Schema {
-	parsed := schema.Schema{}
-
-	for _, rawTrigger := range yml.Triggers {
-		trigger := schema.Trigger{}
-
-		operation, err := util.FindMapKeyByValue(common.DbOperationNames, rawTrigger.Operation)
-		if err != nil {
-			panic(err)
+// Backfills default values for schema
+func (h *YmlSchemaParser) backfillSchema(yml schema.Schema) {
+	for i, definition := range yml.Definitions {
+		if definition.Trigger.Schema == "" {
+			yml.Definitions[i].Trigger.Schema = "public"
 		}
 
-		triggerType, err := util.FindMapKeyByValue(schema.TriggerTypeNames, rawTrigger.TriggerType)
-		if err != nil {
-			panic(err)
+		if definition.Action.Type == "" {
+			yml.Definitions[i].Action.Type = schema.ActionType.Http
 		}
 
-		trigger.Operation = operation
-		trigger.Table = rawTrigger.Table
-		trigger.Schema = rawTrigger.Schema
-		trigger.TriggerType = triggerType
-		trigger.Config = make(map[string]string)
-
-		if trigger.TriggerType == schema.Http {
-			trigger.Config["url"] = rawTrigger.Url
+		if definition.Action.Method == "" {
+			yml.Definitions[i].Action.Method = schema.HttpMethod.Post
 		}
-
-		parsed.Triggers = append(parsed.Triggers, trigger)
 	}
-
-	return parsed
 }

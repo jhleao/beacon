@@ -43,3 +43,12 @@ func (ps *PubSub[T]) Publish(value T) {
 		go callback(value)
 	}
 }
+
+func (ps *PubSub[T]) PublishBlocking(value T) {
+	ps.mu.Lock()
+	defer ps.mu.Unlock()
+
+	for _, callback := range ps.subscribers {
+		callback(value)
+	}
+}

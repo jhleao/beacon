@@ -1,7 +1,7 @@
 package common
 
 import (
-	"beacon/go/log"
+	"beacon/go/blog"
 	"beacon/go/util"
 	"context"
 	"os"
@@ -14,34 +14,38 @@ import (
 type Shutdown struct {
 	Ctx       context.Context
 	WaitGroup *sync.WaitGroup
+	Shutdown  context.CancelFunc
+}
+
+func NewShutdown() Shutdown {
+	shutdownWaitGroup := sync.WaitGroup{}
+	shutdownCtx, shutdown := context.WithCancel(context.Background())
+
+	return Shutdown{
+		Ctx:       shutdownCtx,
+		WaitGroup: &shutdownWaitGroup,
+		Shutdown:  shutdown,
+	}
 }
 
 func WithShutdown(fn func(sh Shutdown)) {
-	shutdownWaitGroup := sync.WaitGroup{}
-	shutdownCtx, shutdown := context.WithCancel(context.Background())
+	sh := NewShutdown()
 	quitCh := make(chan os.Signal, 1)
 	signal.Notify(quitCh, os.Interrupt, syscall.SIGTERM)
 
-	sh := Shutdown{
-		Ctx:       shutdownCtx,
-		WaitGroup: &shutdownWaitGroup,
-	}
-
 	go func() {
 		<-quitCh
-		log.Info("Shutting down...")
-		shutdown()
+		blog.Info("Shutting down...")
+		sh.Shutdown()
 		time.Sleep(1 * time.Second)
 	}()
 
 	fn(sh)
 
 	select {
-	case <-util.WaitGroupToChan(&shutdownWaitGroup):
-		log.Info("Wait group finished.")
-	case <-shutdownCtx.Done():
-		log.Info("Shutdown context called.")
+	case <-util.WaitGroupToChan(sh.WaitGroup):
+	case <-sh.Ctx.Done():
 	}
 
-	log.Info("Exited.")
+	blog.Info("Exited.")
 }

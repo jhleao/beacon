@@ -1,9 +1,9 @@
 package web
 
 import (
+	"beacon/go/blog"
 	"beacon/go/common"
 	"beacon/go/db"
-	"beacon/go/log"
 	"beacon/go/schema"
 	"encoding/json"
 	"fmt"
@@ -28,11 +28,11 @@ func NewBeaconServer(sh common.Shutdown, schemaHandler schema.Parser, db db.Conn
 	port, err := strconv.Atoi(strPort)
 
 	if err != nil {
-		log.Fatal("Invalid port value variable: " + strPort)
+		blog.Fatal("Invalid port value variable: " + strPort)
 	}
 
 	if adminToken == "" {
-		log.Fatal("Admin token cannot be empty")
+		blog.Fatal("Admin token cannot be empty")
 	}
 
 	return &BeaconServer{
@@ -49,15 +49,15 @@ func (s BeaconServer) Start() {
 
 	portStr := fmt.Sprintf(":%d", s.port)
 
-	log.Info("Starting server on port " + portStr)
+	blog.Info("Starting server on port " + portStr)
 
 	go func() {
 		if err := http.ListenAndServe(portStr, nil); err != nil {
-			log.Fatal(err.Error())
+			blog.Fatal(err.Error())
 		}
 	}()
 
-	log.Info("Server started")
+	blog.Info("Server started")
 }
 
 func (s BeaconServer) writeErr(w http.ResponseWriter, msg string, status int) {
@@ -77,12 +77,12 @@ func (s BeaconServer) handleSchemaPatch(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 
-	log.Info("Received schema patch")
+	blog.Info("Received schema patch")
 
 	body, err := io.ReadAll(r.Body)
 	if err != nil {
 		s.writeErr(w, "Failed to read request body", http.StatusBadRequest)
-		log.Warn("Failed to read request body", "err", err)
+		blog.Warn("Failed to read request body", "err", err)
 		return
 	}
 
@@ -94,19 +94,19 @@ func (s BeaconServer) handleSchemaPatch(w http.ResponseWriter, r *http.Request) 
 
 	parsedSchema, err := s.schema.ValidateAndParse(body)
 	if err != nil {
-		log.Error("Failed to validate schema", "err", err)
-		s.writeErr(w, "Failed to validate schema", http.StatusBadRequest)
+		blog.Error("Failed to validate schema", "err", err)
+		s.writeErr(w, err.Error(), http.StatusBadRequest)
 		return
 	}
 
 	err = s.db.ApplySchema(parsedSchema)
 	if err != nil {
 		s.writeErr(w, "Failed to apply schema", http.StatusInternalServerError)
-		log.Error("Failed to apply schema", "err", err)
+		blog.Error("Failed to apply schema", "err", err)
 		return
 	}
 
-	log.Info("Schema patch processed successfully")
+	blog.Info("Schema patch processed successfully")
 	w.WriteHeader(http.StatusOK)
 }
 func (s BeaconServer) setupRoutes() {

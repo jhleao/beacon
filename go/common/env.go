@@ -1,7 +1,7 @@
 package common
 
 import (
-	"beacon/go/log"
+	"beacon/go/blog"
 
 	"github.com/joho/godotenv"
 )
@@ -9,6 +9,6 @@ import (
 func LoadEnv() {
 	envErr := godotenv.Load()
 	if envErr != nil {
-		log.Warn("Could not load .env file", "error", envErr.Error())
+		blog.Warn("Could not load .env file", "error", envErr.Error())
 	}
 }
