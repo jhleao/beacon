@@ -118,7 +118,7 @@ func (g *SSRFGuard) CheckURL(ctx context.Context, rawURL string) (string, error)
 }
 
 // WithPolicy returns a guard with custom policy applied.
-func (g *SSRFGuard) WithPolicy(policy SSRFPolicy) *SSRFGuard {
+func (g *SSRFGuard) WithPolicy(policy SSRFPolicy) PolicyChecker {
 	if policy.AllowPrivate {
 		// Return a guard with no blocked ranges
 		return &SSRFGuard{

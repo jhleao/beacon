@@ -8,6 +8,7 @@ import (
 	"sync"
 	"time"
 
+	"beacon/internal/db"
 	"beacon/internal/dispatcher/retry"
 	"beacon/internal/httpdeliver"
 	"beacon/internal/outbox"
@@ -24,7 +25,7 @@ type Config struct {
 
 // Dispatcher manages event claiming and delivery.
 type Dispatcher struct {
-	pool       poolInterface
+	pool       *db.Pool
 	repo       *outbox.Repository
 	client     *httpdeliver.Client
 	config     Config
@@ -38,20 +39,9 @@ type Dispatcher struct {
 	stopCh   chan struct{}
 }
 
-// poolInterface abstracts db.Pool for testing.
-type poolInterface interface {
-	Exec(ctx context.Context, sql string, args ...any) (any, error)
-	QueryRow(ctx context.Context, sql string, args ...any) Row
-}
-
-// Row abstracts pgx.Row for testing.
-type Row interface {
-	Scan(dest ...any) error
-}
-
 // New creates a new Dispatcher.
 func New(
-	pool poolInterface,
+	pool *db.Pool,
 	repo *outbox.Repository,
 	client *httpdeliver.Client,
 	config Config,

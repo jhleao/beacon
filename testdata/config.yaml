@@ -1,0 +1,60 @@
+version: 1
+
+destinations:
+  - name: analytics
+    url: https://analytics.example.com/events
+    method: POST
+    timeout_ms: 5000
+    max_in_flight: 50
+    headers:
+      X-Source: beacon
+      X-Environment: development
+
+  - name: audit-log
+    url: https://audit.internal:8443/ingest
+    timeout_ms: 10000
+    max_in_flight: 20
+    ssrf_policy:
+      allow_private: true
+
+  - name: slack
+    url: https://hooks.slack.com/services/XXX/YYY/ZZZ
+    timeout_ms: 3000
+    max_in_flight: 5
+
+subscriptions:
+  - name: users-created
+    table: public.users
+    operation: INSERT
+    destination: analytics
+
+  - name: users-updated
+    table: public.users
+    operation: UPDATE
+    destination: analytics
+    trigger_on: [email, name, plan_id]
+    select: [id, email, name, plan_id, updated_at]
+
+  - name: users-deleted
+    table: public.users
+    operation: DELETE
+    destination: audit-log
+
+  - name: orders-created
+    table: public.orders
+    operation: INSERT
+    destination: analytics
+    select: [id, user_id, total, created_at]
+
+  - name: orders-status-changed
+    table: public.orders
+    operation: UPDATE
+    destination: analytics
+    trigger_on: [status]
+    select: [id, status, updated_at]
+
+  - name: large-orders-slack
+    table: public.orders
+    operation: INSERT
+    destination: slack
+    select: [id, user_id, total]
