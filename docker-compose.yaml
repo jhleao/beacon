@@ -1,0 +1,54 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: beacon-postgres
+    ports:
+      - "5432:5432"
+    environment:
+      POSTGRES_USER: beacon
+      POSTGRES_PASSWORD: beacon
+      POSTGRES_DB: beacon_dev
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U beacon -d beacon_dev"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  webhook:
+    build:
+      context: ./scripts
+      dockerfile: Dockerfile.webhook
+    container_name: beacon-webhook
+    ports:
+      - "9000:9000"
+    environment:
+      - PORT=9000
+      - FAIL_RATE=0
+
+  prometheus:
+    image: prom/prometheus:latest
+    container_name: beacon-prometheus
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./scripts/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+    profiles:
+      - monitoring
+
+  grafana:
+    image: grafana/grafana:latest
+    container_name: beacon-grafana
+    ports:
+      - "3000:3000"
+    environment:
+      - GF_SECURITY_ADMIN_PASSWORD=admin
+    volumes:
+      - grafana_data:/var/lib/grafana
+    profiles:
+      - monitoring
+
+volumes:
+  postgres_data:
+  grafana_data:
