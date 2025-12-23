@@ -26,7 +26,7 @@ Building a PostgreSQL-native webhook delivery system based on the specs in `spec
 - [x] Implement environment variable loading (EnvConfig)
 - [x] Implement secret loading (HMAC, control plane)
 - [x] Implement ParseTable helper
-- [ ] Write config tests
+- [x] Write config tests
 
 ## Phase 4: Capture Module (internal/capture)
 - [x] Implement Installer struct
@@ -58,7 +58,7 @@ Building a PostgreSQL-native webhook delivery system based on the specs in `spec
 - [x] Implement ShouldRetry
 - [x] Implement IsRetryableError
 - [x] Implement IsRetryableStatus
-- [ ] Write retry tests
+- [x] Write retry tests
 
 ## Phase 7: HTTP Delivery Module (internal/httpdeliver)
 - [x] Implement SSRFGuard with blocked ranges
@@ -67,7 +67,7 @@ Building a PostgreSQL-native webhook delivery system based on the specs in `spec
 - [x] Implement Signer (HMAC-SHA256)
 - [x] Implement Client struct
 - [x] Implement Deliver method with all features
-- [ ] Write httpdeliver tests
+- [x] Write httpdeliver tests (signer, ssrf, client)
 
 ## Phase 8: Dispatcher Module (internal/dispatcher)
 - [x] Implement Dispatcher struct and Config
@@ -87,7 +87,7 @@ Building a PostgreSQL-native webhook delivery system based on the specs in `spec
 - [x] Implement all metric types (delivery, outbox, worker, API)
 - [x] Implement Logger with slog
 - [x] Implement HealthResponse struct
-- [ ] Write observability tests
+- [x] Write observability tests (metrics, logging)
 
 ## Phase 10: Control Plane Module (internal/controlplane)
 - [x] Implement ApplyService
@@ -125,8 +125,8 @@ Building a PostgreSQL-native webhook delivery system based on the specs in `spec
 ---
 
 ## Current Status
-Core implementation complete! All main modules are implemented.
-Next: Add tests for all modules.
+Core implementation complete! Unit tests passing for config, retry, httpdeliver, and observability modules.
+Next: Add database integration tests using testcontainers.
 
 ## Milestones Completed
 - [x] Phase 1: Project Foundation
@@ -150,3 +150,5 @@ Next: Add tests for all modules.
 5. feat: add observability module
 6. feat: add control plane module
 7. feat: add main entry point and development scripts
+8. test: add unit tests for core modules
+9. test: add HTTP client delivery tests
