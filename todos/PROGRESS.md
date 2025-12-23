@@ -35,7 +35,7 @@ Building a PostgreSQL-native webhook delivery system based on the specs in `spec
 - [x] Implement UninstallTrigger
 - [x] Implement ListTriggers
 - [x] Add capture_changes() and extract_pk() to migrations
-- [ ] Write capture tests
+- [x] Write capture tests (integration + DDL unit tests)
 
 ## Phase 5: Outbox Module (internal/outbox)
 - [x] Define Event type
@@ -50,7 +50,7 @@ Building a PostgreSQL-native webhook delivery system based on the specs in `spec
 - [x] Implement RecordAttempt
 - [x] Implement CountByState
 - [x] Implement CountPendingForSubscription
-- [ ] Write outbox tests
+- [x] Write outbox tests (integration with testcontainers)
 
 ## Phase 6: Retry Module (internal/dispatcher/retry)
 - [x] Define constants (BaseDelay, MaxDelay, MaxAttempts, JitterRatio)
@@ -114,7 +114,7 @@ Building a PostgreSQL-native webhook delivery system based on the specs in `spec
 - [x] Create scripts/seed.sh
 - [x] Create scripts/prometheus.yml
 - [x] Create testdata/config.yaml
-- [ ] Create test utilities (internal/testutil)
+- [x] Create test utilities (internal/testutil)
 
 ## Phase 13: Testing & Integration
 - [ ] Write unit tests for all modules
@@ -125,8 +125,11 @@ Building a PostgreSQL-native webhook delivery system based on the specs in `spec
 ---
 
 ## Current Status
-Core implementation complete! Unit tests passing for config, retry, httpdeliver, and observability modules.
-Next: Add database integration tests using testcontainers.
+Core implementation complete! Tests passing for all core modules:
+- Config, retry, httpdeliver, observability: Unit tests
+- Outbox, capture: Integration tests with testcontainers
+
+Next: Add database pool tests and consider control plane tests.
 
 ## Milestones Completed
 - [x] Phase 1: Project Foundation
@@ -152,3 +155,5 @@ Next: Add database integration tests using testcontainers.
 7. feat: add main entry point and development scripts
 8. test: add unit tests for core modules
 9. test: add HTTP client delivery tests
+10. test: add outbox repository integration tests
+11. test: add capture module integration tests
