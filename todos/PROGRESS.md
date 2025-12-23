@@ -17,7 +17,7 @@ Building a PostgreSQL-native webhook delivery system based on the specs in `spec
 - [x] Implement WithTx transaction helper
 - [x] Implement Migrate function
 - [x] Create SQL migrations (001_core.sql)
-- [ ] Write database tests
+- [x] Write database tests (integration)
 
 ## Phase 3: Config Module (internal/config)
 - [x] Define YAML config types (BeaconConfig, DestinationConfig, SubscriptionConfig)
@@ -125,11 +125,12 @@ Building a PostgreSQL-native webhook delivery system based on the specs in `spec
 ---
 
 ## Current Status
-Core implementation complete! Tests passing for all core modules:
+Core implementation complete! Comprehensive test coverage:
 - Config, retry, httpdeliver, observability: Unit tests
-- Outbox, capture: Integration tests with testcontainers
+- Database pool, outbox, capture: Integration tests with testcontainers
+- E2E trigger capture flow tests validating INSERT, UPDATE, and disabled subscriptions
 
-Next: Add database pool tests and consider control plane tests.
+All tests passing. Core functionality verified end-to-end.
 
 ## Milestones Completed
 - [x] Phase 1: Project Foundation
@@ -157,3 +158,5 @@ Next: Add database pool tests and consider control plane tests.
 9. test: add HTTP client delivery tests
 10. test: add outbox repository integration tests
 11. test: add capture module integration tests
+12. test: add database pool integration tests
+13. test: add end-to-end capture flow tests
