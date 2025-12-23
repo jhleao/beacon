@@ -29,41 +29,43 @@ func (r *Repository) Claim(ctx context.Context, workerID string, limit int) ([]C
 		WITH claimed AS (
 			SELECT e.id
 			FROM beacon.outbox_events e
+			JOIN beacon.subscriptions s ON s.id = e.subscription_id
 			WHERE e.state = 'pending'
 			  AND e.visible_at <= now()
+			  AND s.deleted_at IS NULL
 			ORDER BY e.visible_at, e.occurred_at
 			LIMIT $1
-			FOR UPDATE SKIP LOCKED
+			FOR UPDATE OF e SKIP LOCKED
+		),
+		updated AS (
+			UPDATE beacon.outbox_events e
+			SET
+				state = 'delivering',
+				locked_by = $2,
+				locked_at = now(),
+				attempts = attempts + 1
+			FROM claimed c
+			WHERE e.id = c.id
+			RETURNING e.*
 		)
-		UPDATE beacon.outbox_events e
-		SET
-			state = 'delivering',
-			locked_by = $2,
-			locked_at = now(),
-			attempts = attempts + 1
-		FROM claimed c
-		JOIN beacon.subscriptions s ON s.id = e.subscription_id
-		JOIN beacon.destinations d ON d.id = s.destination_id
-		WHERE e.id = c.id
-		  AND s.deleted_at IS NULL
-		RETURNING
-			e.id,
-			e.subscription_id,
-			e.occurred_at,
-			e.table_schema,
-			e.table_name,
-			e.operation,
-			e.pk,
-			e.old_data,
-			e.new_data,
-			e.payload,
-			e.state,
-			e.visible_at,
-			e.locked_by,
-			e.locked_at,
-			e.attempts,
-			e.last_error,
-			e.created_at,
+		SELECT
+			u.id,
+			u.subscription_id,
+			u.occurred_at,
+			u.table_schema,
+			u.table_name,
+			u.operation,
+			u.pk,
+			u.old_data,
+			u.new_data,
+			u.payload,
+			u.state,
+			u.visible_at,
+			u.locked_by,
+			u.locked_at,
+			u.attempts,
+			u.last_error,
+			u.created_at,
 			d.id,
 			d.name,
 			d.url,
@@ -72,6 +74,10 @@ func (r *Repository) Claim(ctx context.Context, workerID string, limit int) ([]C
 			d.timeout_ms,
 			d.max_in_flight,
 			d.ssrf_policy
+		FROM updated u
+		JOIN beacon.subscriptions s ON s.id = u.subscription_id
+		JOIN beacon.destinations d ON d.id = s.destination_id
+		ORDER BY u.visible_at, u.occurred_at
 	`, limit, workerID)
 	if err != nil {
 		return nil, fmt.Errorf("claim events: %w", err)
