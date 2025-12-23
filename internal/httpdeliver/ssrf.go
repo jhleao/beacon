@@ -49,7 +49,6 @@ func NewSSRFGuard() *SSRFGuard {
 		"::1/128",     // Loopback
 		"fc00::/7",    // Unique local
 		"fe80::/10",   // Link-local
-		"::ffff:0:0/96", // IPv4-mapped
 	}
 
 	var blocked []*net.IPNet
@@ -140,6 +139,11 @@ func (g *SSRFGuard) WithPolicy(policy SSRFPolicy) PolicyChecker {
 }
 
 func (g *SSRFGuard) isBlocked(ip net.IP) bool {
+	// Normalize IPv4-mapped IPv6 addresses to IPv4
+	if ip4 := ip.To4(); ip4 != nil {
+		ip = ip4
+	}
+
 	for _, block := range g.blockedRanges {
 		if block.Contains(ip) {
 			return true

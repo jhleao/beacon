@@ -4,121 +4,120 @@
 Building a PostgreSQL-native webhook delivery system based on the specs in `spec/`.
 
 ## Phase 1: Project Foundation
-- [ ] Initialize Go module and dependencies
-- [ ] Create directory structure
-- [ ] Create Makefile
-- [ ] Create docker-compose.yaml
-- [ ] Create .env.example
-- [ ] Create .gitignore
+- [x] Initialize Go module and dependencies
+- [x] Create directory structure
+- [x] Create Makefile
+- [x] Create docker-compose.yaml
+- [x] Create .env.example
+- [x] Create .gitignore
 
 ## Phase 2: Database Module (internal/db)
-- [ ] Create Pool wrapper with pgxpool
-- [ ] Implement connection pool configuration
-- [ ] Implement WithTx transaction helper
-- [ ] Implement Migrate function
-- [ ] Create SQL migrations (001_core.sql)
+- [x] Create Pool wrapper with pgxpool
+- [x] Implement connection pool configuration
+- [x] Implement WithTx transaction helper
+- [x] Implement Migrate function
+- [x] Create SQL migrations (001_core.sql)
 - [ ] Write database tests
 
 ## Phase 3: Config Module (internal/config)
-- [ ] Define YAML config types (BeaconConfig, DestinationConfig, SubscriptionConfig)
-- [ ] Implement YAML parsing with defaults
-- [ ] Implement validation logic
-- [ ] Implement environment variable loading (EnvConfig)
-- [ ] Implement secret loading (HMAC, control plane)
-- [ ] Implement ParseTable helper
+- [x] Define YAML config types (BeaconConfig, DestinationConfig, SubscriptionConfig)
+- [x] Implement YAML parsing with defaults
+- [x] Implement validation logic
+- [x] Implement environment variable loading (EnvConfig)
+- [x] Implement secret loading (HMAC, control plane)
+- [x] Implement ParseTable helper
 - [ ] Write config tests
 
 ## Phase 4: Capture Module (internal/capture)
-- [ ] Implement Installer struct
-- [ ] Implement SQL identifier quoting (ddl.go)
-- [ ] Implement InstallTrigger (idempotent)
-- [ ] Implement UninstallTrigger
-- [ ] Implement ListTriggers
-- [ ] Implement EnsureFunctions
-- [ ] Add capture_changes() and extract_pk() to migrations
+- [x] Implement Installer struct
+- [x] Implement SQL identifier quoting (ddl.go)
+- [x] Implement InstallTrigger (idempotent)
+- [x] Implement UninstallTrigger
+- [x] Implement ListTriggers
+- [x] Add capture_changes() and extract_pk() to migrations
 - [ ] Write capture tests
 
 ## Phase 5: Outbox Module (internal/outbox)
-- [ ] Define Event type
-- [ ] Define State constants
-- [ ] Define Destination type
-- [ ] Define ClaimedEvent type
-- [ ] Implement Repository struct
-- [ ] Implement Claim with FOR UPDATE SKIP LOCKED
-- [ ] Implement Ack
-- [ ] Implement Reschedule
-- [ ] Implement ToDead (with snapshot)
-- [ ] Implement RecordAttempt
-- [ ] Implement CountByState
-- [ ] Implement CountPendingForSubscription
+- [x] Define Event type
+- [x] Define State constants
+- [x] Define Destination type
+- [x] Define ClaimedEvent type
+- [x] Implement Repository struct
+- [x] Implement Claim with FOR UPDATE SKIP LOCKED
+- [x] Implement Ack
+- [x] Implement Reschedule
+- [x] Implement ToDead (with snapshot)
+- [x] Implement RecordAttempt
+- [x] Implement CountByState
+- [x] Implement CountPendingForSubscription
 - [ ] Write outbox tests
 
 ## Phase 6: Retry Module (internal/dispatcher/retry)
-- [ ] Define constants (BaseDelay, MaxDelay, MaxAttempts, JitterRatio)
-- [ ] Implement NextDelay (exponential backoff with jitter)
-- [ ] Implement ShouldRetry
-- [ ] Implement IsRetryableError
-- [ ] Implement IsRetryableStatus
+- [x] Define constants (BaseDelay, MaxDelay, MaxAttempts, JitterRatio)
+- [x] Implement NextDelay (exponential backoff with jitter)
+- [x] Implement ShouldRetry
+- [x] Implement IsRetryableError
+- [x] Implement IsRetryableStatus
 - [ ] Write retry tests
 
 ## Phase 7: HTTP Delivery Module (internal/httpdeliver)
-- [ ] Implement SSRFGuard with blocked ranges
-- [ ] Implement DNS caching for SSRF
-- [ ] Implement SSRFPolicy support
-- [ ] Implement Signer (HMAC-SHA256)
-- [ ] Implement Client struct
-- [ ] Implement Deliver method with all features
+- [x] Implement SSRFGuard with blocked ranges
+- [x] Implement DNS caching for SSRF
+- [x] Implement SSRFPolicy support
+- [x] Implement Signer (HMAC-SHA256)
+- [x] Implement Client struct
+- [x] Implement Deliver method with all features
 - [ ] Write httpdeliver tests
 
 ## Phase 8: Dispatcher Module (internal/dispatcher)
-- [ ] Implement Dispatcher struct and Config
-- [ ] Implement worker ID generation
-- [ ] Implement main polling loop
-- [ ] Implement worker pool
-- [ ] Implement processEvent
-- [ ] Implement failure handling
-- [ ] Implement Semaphores for per-destination concurrency
-- [ ] Implement heartbeat loop
-- [ ] Implement reaper loop
-- [ ] Implement graceful shutdown
+- [x] Implement Dispatcher struct and Config
+- [x] Implement worker ID generation
+- [x] Implement main polling loop
+- [x] Implement worker pool
+- [x] Implement processEvent
+- [x] Implement failure handling
+- [x] Implement Semaphores for per-destination concurrency
+- [x] Implement heartbeat loop
+- [x] Implement reaper loop
+- [x] Implement graceful shutdown
 - [ ] Write dispatcher tests
 
 ## Phase 9: Observability Module (internal/observability)
-- [ ] Implement Metrics with Prometheus
-- [ ] Implement all metric types (delivery, outbox, worker, API)
-- [ ] Implement Logger with slog
-- [ ] Implement HealthResponse struct
+- [x] Implement Metrics with Prometheus
+- [x] Implement all metric types (delivery, outbox, worker, API)
+- [x] Implement Logger with slog
+- [x] Implement HealthResponse struct
 - [ ] Write observability tests
 
 ## Phase 10: Control Plane Module (internal/controlplane)
-- [ ] Implement ApplyService
-- [ ] Implement diff algorithm for destinations/subscriptions
-- [ ] Implement Apply logic
-- [ ] Implement DryRun
-- [ ] Implement Export
-- [ ] Implement DrainService
-- [ ] Implement HTTP server
-- [ ] Implement auth middleware
-- [ ] Implement all routes (apply, config, validate, health, metrics, etc.)
+- [x] Implement ApplyService
+- [x] Implement diff algorithm for destinations/subscriptions
+- [x] Implement Apply logic
+- [x] Implement DryRun
+- [x] Implement Export
+- [x] Implement DrainService
+- [x] Implement HTTP server
+- [x] Implement auth middleware
+- [x] Implement all routes (apply, config, validate, health, metrics, etc.)
 - [ ] Implement replay endpoint
 - [ ] Write controlplane tests
 
 ## Phase 11: Main Entry Point (cmd/beacon)
-- [ ] Create main.go with CLI commands
-- [ ] Implement serve command
-- [ ] Implement migrate command
-- [ ] Wire up all dependencies
-- [ ] Implement graceful shutdown
+- [x] Create main.go with CLI commands
+- [x] Implement serve command
+- [x] Implement migrate command
+- [x] Wire up all dependencies
+- [x] Implement graceful shutdown
 
 ## Phase 12: Development Tooling
-- [ ] Create scripts/webhook-receiver.go
-- [ ] Create scripts/seed.sh
-- [ ] Create scripts/prometheus.yml
-- [ ] Create testdata/config.yaml
+- [x] Create scripts/webhook-receiver.go
+- [x] Create scripts/seed.sh
+- [x] Create scripts/prometheus.yml
+- [x] Create testdata/config.yaml
 - [ ] Create test utilities (internal/testutil)
 
 ## Phase 13: Testing & Integration
-- [ ] Run all unit tests
+- [ ] Write unit tests for all modules
 - [ ] Run all integration tests
 - [ ] Manual end-to-end testing
 - [ ] Fix any issues
@@ -126,7 +125,28 @@ Building a PostgreSQL-native webhook delivery system based on the specs in `spec
 ---
 
 ## Current Status
-Starting Phase 1...
+Core implementation complete! All main modules are implemented.
+Next: Add tests for all modules.
 
 ## Milestones Completed
-(none yet)
+- [x] Phase 1: Project Foundation
+- [x] Phase 2: Database Module (implementation)
+- [x] Phase 3: Config Module (implementation)
+- [x] Phase 4: Capture Module (implementation)
+- [x] Phase 5: Outbox Module (implementation)
+- [x] Phase 6: Retry Module (implementation)
+- [x] Phase 7: HTTP Delivery Module (implementation)
+- [x] Phase 8: Dispatcher Module (implementation)
+- [x] Phase 9: Observability Module (implementation)
+- [x] Phase 10: Control Plane Module (implementation)
+- [x] Phase 11: Main Entry Point
+- [x] Phase 12: Development Tooling (partial)
+
+## Git Commits Made
+1. feat: add project foundation and core modules
+2. feat: add outbox and retry modules
+3. feat: add HTTP delivery module
+4. feat: add dispatcher module with worker pool
+5. feat: add observability module
+6. feat: add control plane module
+7. feat: add main entry point and development scripts
