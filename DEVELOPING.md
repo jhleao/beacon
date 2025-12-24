@@ -170,6 +170,152 @@ Core tables in the `beacon` schema:
 | `delivery_attempts` | Audit log of attempts |
 | `dead_letters` | Failed events for debugging |
 
+## How Triggers Work
+
+Beacon uses PostgreSQL `AFTER` triggers to capture row changes. Here's the complete flow:
+
+### 1. Trigger Installation
+
+When you apply a config with subscriptions, Beacon installs a trigger on each referenced table:
+
+```sql
+CREATE TRIGGER beacon_capture_public_orders
+  AFTER INSERT OR UPDATE OR DELETE ON public.orders
+  FOR EACH ROW EXECUTE FUNCTION beacon.capture_changes();
+```
+
+One trigger per table handles all operations (INSERT/UPDATE/DELETE). The trigger is idempotent—applying config twice won't create duplicates.
+
+### 2. The `capture_changes()` Function
+
+When a row changes, `beacon.capture_changes()` runs **inside the same transaction**:
+
+```sql
+-- Pseudocode of what the trigger does:
+FOR each matching subscription (same table, operation, enabled, not draining):
+
+    -- Check trigger_columns filter (UPDATE only)
+    IF operation = UPDATE AND trigger_columns IS SET:
+        skip if none of those columns changed
+
+    -- Filter payload columns if configured
+    old_data = filter_columns(OLD, payload_columns)
+    new_data = filter_columns(NEW, payload_columns)
+
+    -- Extract primary key
+    pk = beacon.extract_pk(schema, table, NEW, OLD)
+
+    -- Build envelope payload
+    payload = {
+        "version": 1,
+        "trigger": {"schema": "...", "table": "...", "operation": "..."},
+        "pk": {...},
+        "old": old_data,  -- null for INSERT
+        "new": new_data   -- null for DELETE
+    }
+
+    -- Insert into outbox (same transaction!)
+    INSERT INTO beacon.outbox_events (
+        subscription_id, table_schema, table_name, operation,
+        pk, old_data, new_data, payload
+    ) VALUES (...)
+```
+
+### 3. Primary Key Extraction
+
+The `beacon.extract_pk()` function queries `information_schema` to find primary key columns:
+
+```sql
+SELECT beacon.extract_pk('public', 'orders', '{"id": 42, "status": "new"}', NULL);
+-- Returns: {"id": 42}
+```
+
+For composite keys, all columns are included:
+
+```sql
+-- Table with (tenant_id, order_id) as PK
+SELECT beacon.extract_pk('public', 'tenant_orders', '{"tenant_id": 1, "order_id": 99, "status": "new"}', NULL);
+-- Returns: {"tenant_id": 1, "order_id": 99}
+```
+
+### 4. Subscription Matching
+
+The trigger only fires for subscriptions that match:
+
+```sql
+WHERE table_schema = TG_TABLE_SCHEMA
+  AND table_name = TG_TABLE_NAME
+  AND operation = TG_OP           -- 'INSERT', 'UPDATE', or 'DELETE'
+  AND enabled = true
+  AND deleted_at IS NULL
+  AND NOT draining
+```
+
+Multiple subscriptions can match the same table/operation (e.g., send to different destinations).
+
+### 5. Column Filtering
+
+**`trigger_columns`** — Only fire on UPDATE if these columns changed:
+
+```yaml
+subscriptions:
+  - name: status-changes
+    table: public.orders
+    events: [UPDATE]
+    trigger_columns: [status, priority]  # Ignore other column updates
+```
+
+**`payload_columns`** — Only include these columns in the payload:
+
+```yaml
+subscriptions:
+  - name: order-notifications
+    table: public.orders
+    events: [INSERT, UPDATE]
+    payload_columns: [id, status, customer_email]  # Exclude sensitive data
+```
+
+### 6. Transactional Guarantee
+
+The key insight: the outbox INSERT happens in the same transaction as your data change.
+
+```sql
+BEGIN;
+  INSERT INTO orders (customer_id, total) VALUES (1, 99.99);
+  -- Trigger fires HERE, inserts into beacon.outbox_events
+COMMIT;  -- Both succeed or both fail
+```
+
+If the transaction rolls back, no event is created. If it commits, the event is guaranteed to exist.
+
+### Example: Full Flow
+
+```sql
+-- 1. Your app inserts an order
+INSERT INTO public.orders (id, customer_id, total, status)
+VALUES (42, 1, 99.99, 'pending');
+
+-- 2. Trigger fires, finds matching subscription "new-orders"
+
+-- 3. Trigger inserts into outbox (same transaction)
+INSERT INTO beacon.outbox_events (
+    subscription_id,
+    table_schema, table_name, operation,
+    pk, new_data, payload, state
+) VALUES (
+    'uuid-of-new-orders-subscription',
+    'public', 'orders', 'INSERT',
+    '{"id": 42}',
+    '{"id": 42, "customer_id": 1, "total": 99.99, "status": "pending"}',
+    '{"version": 1, "trigger": {...}, "pk": {"id": 42}, "old": null, "new": {...}}',
+    'pending'
+);
+
+-- 4. Transaction commits - both order AND event are durable
+
+-- 5. Dispatcher polls, claims event, delivers webhook
+```
+
 ## Adding a Migration
 
 1. Create `internal/db/migrations/NNN_description.sql`
