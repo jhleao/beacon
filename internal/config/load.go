@@ -19,6 +19,11 @@ type EnvConfig struct {
 	LogFormat            string
 	MaxPayloadBytes      int
 	ControlPlaneSecret   string
+
+	// Janitor settings
+	RetentionHours    int
+	JanitorInterval   time.Duration
+	JanitorBatchSize  int
 }
 
 // LoadEnv loads configuration from environment variables.
@@ -33,6 +38,11 @@ func LoadEnv() (*EnvConfig, error) {
 		LogFormat:          getEnvOr("BEACON_LOG_FORMAT", "json"),
 		MaxPayloadBytes:    parseIntOr("BEACON_MAX_PAYLOAD_BYTES", 1048576),
 		ControlPlaneSecret: os.Getenv("BEACON_CONTROLPLANE_SECRET"),
+
+		// Janitor defaults: 7 days retention, run hourly, 1000 events per batch
+		RetentionHours:   parseIntOr("BEACON_RETENTION_HOURS", 168),
+		JanitorInterval:  parseDurationOr("BEACON_JANITOR_INTERVAL", 1*time.Hour),
+		JanitorBatchSize: parseIntOr("BEACON_JANITOR_BATCH_SIZE", 1000),
 	}
 
 	// Validate required fields

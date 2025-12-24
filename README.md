@@ -125,6 +125,9 @@ Beacon installs PostgreSQL triggers on your tables. When rows change, webhooks f
 | `BEACON_POLL_INTERVAL` | Outbox polling interval | `100ms` |
 | `BEACON_BATCH_SIZE` | Events to claim per poll | `100` |
 | `BEACON_WORKERS` | Concurrent delivery workers | `10` |
+| `BEACON_RETENTION_HOURS` | Retention period for delivered events | `168` (7 days) |
+| `BEACON_JANITOR_INTERVAL` | Cleanup interval | `1h` |
+| `BEACON_JANITOR_BATCH_SIZE` | Max events cleaned per cycle | `1000` |
 
 ### Webhook Payload
 
@@ -231,6 +234,7 @@ Beacon exposes Prometheus metrics at `/metrics`:
 | `beacon_outbox_depth` | gauge | Current event count by state |
 | `beacon_workers_active` | gauge | Active worker goroutines |
 | `beacon_events_reaped_total` | counter | Events recovered from crashed workers |
+| `beacon_events_cleaned_total` | counter | Old events cleaned by janitor |
 
 **Recommended alerts:**
 
@@ -240,15 +244,16 @@ Beacon exposes Prometheus metrics at `/metrics`:
 
 ## Maintenance
 
-Beacon doesn't auto-delete delivered events. Periodically clean up:
+Beacon automatically cleans up delivered events older than the retention period (default: 7 days). Configure with `BEACON_RETENTION_HOURS`.
+
+Dead letters are preserved for manual review:
 
 ```sql
--- Remove delivered events older than 7 days
-DELETE FROM beacon.outbox_events
-WHERE state = 'delivered' AND created_at < now() - INTERVAL '7 days';
+-- Inspect recent dead letters
+SELECT * FROM beacon.dead_letters WHERE dead_at > now() - INTERVAL '1 day';
 
--- Archive or inspect dead letters
-SELECT * FROM beacon.dead_letters WHERE created_at > now() - INTERVAL '1 day';
+-- Archive old dead letters (manual)
+DELETE FROM beacon.dead_letters WHERE dead_at < now() - INTERVAL '30 days';
 ```
 
 ## License
