@@ -276,3 +276,34 @@ func (r *Repository) CountPendingForSubscription(ctx context.Context, subID uuid
 	}
 	return count, nil
 }
+
+// CleanupDelivered deletes delivered events older than the given duration.
+// Returns the number of events deleted. Uses batching and SKIP LOCKED to avoid
+// blocking active deliveries.
+func (r *Repository) CleanupDelivered(ctx context.Context, olderThan time.Duration, limit int) (int64, error) {
+	var deleted int64
+	err := r.pool.QueryRow(ctx, `
+		WITH old_events AS (
+			SELECT id FROM beacon.outbox_events
+			WHERE state = 'delivered'
+			  AND created_at < now() - $1::interval
+			ORDER BY created_at
+			LIMIT $2
+			FOR UPDATE SKIP LOCKED
+		),
+		cleanup_attempts AS (
+			DELETE FROM beacon.delivery_attempts
+			WHERE event_id IN (SELECT id FROM old_events)
+		),
+		cleanup_events AS (
+			DELETE FROM beacon.outbox_events
+			WHERE id IN (SELECT id FROM old_events)
+			RETURNING id
+		)
+		SELECT COUNT(*) FROM cleanup_events
+	`, olderThan.String(), limit).Scan(&deleted)
+	if err != nil {
+		return 0, fmt.Errorf("cleanup delivered: %w", err)
+	}
+	return deleted, nil
+}

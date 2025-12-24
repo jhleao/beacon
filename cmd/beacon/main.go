@@ -7,6 +7,7 @@ import (
 	"os"
 	"os/signal"
 	"syscall"
+	"time"
 
 	"beacon/internal/capture"
 	"beacon/internal/config"
@@ -15,6 +16,7 @@ import (
 	"beacon/internal/db"
 	"beacon/internal/dispatcher"
 	"beacon/internal/httpdeliver"
+	"beacon/internal/janitor"
 	"beacon/internal/observability"
 	"beacon/internal/outbox"
 	"beacon/internal/version"
@@ -67,7 +69,10 @@ Environment Variables:
   BEACON_HMAC_SECRET            Global HMAC signing secret (optional)
   BEACON_CONTROLPLANE_SECRET    Bearer token for API auth (required)
   BEACON_LOG_LEVEL              Log level: debug, info, warn, error (default: info)
-  BEACON_LOG_FORMAT             Log format: json, text (default: json)`)
+  BEACON_LOG_FORMAT             Log format: json, text (default: json)
+  BEACON_RETENTION_HOURS        Retention period for delivered events (default: 168)
+  BEACON_JANITOR_INTERVAL       Janitor cleanup interval (default: 1h)
+  BEACON_JANITOR_BATCH_SIZE     Max events cleaned per cycle (default: 1000)`)
 }
 
 func runServe() {
@@ -141,6 +146,15 @@ func runServe() {
 			logger.Error("drain loop failed", "error", err)
 		}
 	}()
+
+	// Start janitor
+	janitorCfg := janitor.Config{
+		RetentionDuration: time.Duration(envCfg.RetentionHours) * time.Hour,
+		Interval:          envCfg.JanitorInterval,
+		BatchSize:         envCfg.JanitorBatchSize,
+	}
+	jan := janitor.New(repo, janitorCfg, logger, metrics)
+	go jan.Run(ctx)
 
 	// Start control plane API
 	go func() {

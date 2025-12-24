@@ -11,17 +11,18 @@ import (
 
 // Metrics provides Prometheus metrics for Beacon.
 type Metrics struct {
-	deliveryTotal     *prometheus.CounterVec
-	deliveryDuration  *prometheus.HistogramVec
-	deliveryAttempts  *prometheus.HistogramVec
-	deadLettersTotal  *prometheus.CounterVec
-	outboxDepth       *prometheus.GaugeVec
+	deliveryTotal      *prometheus.CounterVec
+	deliveryDuration   *prometheus.HistogramVec
+	deliveryAttempts   *prometheus.HistogramVec
+	deadLettersTotal   *prometheus.CounterVec
+	outboxDepth        *prometheus.GaugeVec
 	eventsClaimedTotal prometheus.Counter
 	eventsReapedTotal  prometheus.Counter
-	workersActive     prometheus.Gauge
-	workerHeartbeats  prometheus.Counter
-	pollDuration      prometheus.Histogram
-	apiRequestsTotal  *prometheus.CounterVec
+	eventsCleanedTotal prometheus.Counter
+	workersActive      prometheus.Gauge
+	workerHeartbeats   prometheus.Counter
+	pollDuration       prometheus.Histogram
+	apiRequestsTotal   *prometheus.CounterVec
 	apiRequestDuration *prometheus.HistogramVec
 }
 
@@ -77,6 +78,12 @@ func NewMetrics(registry prometheus.Registerer) *Metrics {
 				Help: "Total events recovered by reaper",
 			},
 		),
+		eventsCleanedTotal: prometheus.NewCounter(
+			prometheus.CounterOpts{
+				Name: "beacon_events_cleaned_total",
+				Help: "Total old delivered events cleaned by janitor",
+			},
+		),
 		workersActive: prometheus.NewGauge(
 			prometheus.GaugeOpts{
 				Name: "beacon_workers_active",
@@ -121,6 +128,7 @@ func NewMetrics(registry prometheus.Registerer) *Metrics {
 		m.outboxDepth,
 		m.eventsClaimedTotal,
 		m.eventsReapedTotal,
+		m.eventsCleanedTotal,
 		m.workersActive,
 		m.workerHeartbeats,
 		m.pollDuration,
@@ -193,6 +201,11 @@ func (m *Metrics) EventsClaimed(count int) {
 // EventsReaped records events recovered by reaper.
 func (m *Metrics) EventsReaped(count int) {
 	m.eventsReapedTotal.Add(float64(count))
+}
+
+// EventsCleaned records events cleaned by janitor.
+func (m *Metrics) EventsCleaned(count int64) {
+	m.eventsCleanedTotal.Add(float64(count))
 }
 
 // SetActiveWorkers sets the current worker count.
