@@ -53,15 +53,15 @@ func NewServer(
 
 func (s *Server) routes() {
 	// Public endpoints (no auth)
-	s.mux.HandleFunc("GET /v1/health", s.handleHealth)
-	s.mux.HandleFunc("GET /v1/metrics", s.handleMetrics)
+	s.mux.HandleFunc("GET /health", s.handleHealth)
+	s.mux.HandleFunc("GET /metrics", s.handleMetrics)
 
 	// Protected endpoints
-	s.mux.HandleFunc("POST /v1/apply", s.authRequired(s.handleApply))
-	s.mux.HandleFunc("GET /v1/config", s.authRequired(s.handleGetConfig))
-	s.mux.HandleFunc("POST /v1/validate", s.authRequired(s.handleValidate))
-	s.mux.HandleFunc("GET /v1/destinations", s.authRequired(s.handleListDestinations))
-	s.mux.HandleFunc("GET /v1/subscriptions", s.authRequired(s.handleListSubscriptions))
+	s.mux.HandleFunc("POST /apply", s.authRequired(s.handleApply))
+	s.mux.HandleFunc("GET /config", s.authRequired(s.handleGetConfig))
+	s.mux.HandleFunc("POST /validate", s.authRequired(s.handleValidate))
+	s.mux.HandleFunc("GET /destinations", s.authRequired(s.handleListDestinations))
+	s.mux.HandleFunc("GET /subscriptions", s.authRequired(s.handleListSubscriptions))
 }
 
 // Handler returns the HTTP handler.
