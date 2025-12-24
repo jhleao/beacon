@@ -72,7 +72,8 @@ Environment Variables:
   BEACON_LOG_FORMAT             Log format: json, text (default: json)
   BEACON_RETENTION_HOURS        Retention period for delivered events (default: 168)
   BEACON_JANITOR_INTERVAL       Janitor cleanup interval (default: 1h)
-  BEACON_JANITOR_BATCH_SIZE     Max events cleaned per cycle (default: 1000)`)
+  BEACON_JANITOR_BATCH_SIZE     Max events cleaned per cycle (default: 1000)
+  BEACON_SEED_CONFIG_PATH       Path to seed config file for auto-bootstrap (optional)`)
 }
 
 func runServe() {
@@ -139,6 +140,27 @@ func runServe() {
 	applySvc := service.NewApplyService(pool, installer)
 	drainSvc := service.NewDrainService(pool, logger)
 	apiServer := api.NewServer(pool, applySvc, envCfg.HTTPAddr, envCfg.ControlPlaneSecret, logger, metrics)
+
+	// Bootstrap seed config if database is clean
+	if envCfg.SeedConfigPath != "" {
+		bootstrapSvc := service.NewBootstrapService(pool, applySvc)
+		result, err := bootstrapSvc.Bootstrap(ctx, envCfg.SeedConfigPath)
+		if err != nil {
+			logger.Error("seed config bootstrap failed", "error", err)
+			os.Exit(1)
+		}
+		if result != nil {
+			if result.Applied {
+				logger.Info("seed config applied successfully",
+					"destinations_created", len(result.ApplyResult.Destinations.Created),
+					"subscriptions_created", len(result.ApplyResult.Subscriptions.Created),
+					"triggers_created", len(result.ApplyResult.Triggers.Created),
+				)
+			} else if result.Skipped {
+				logger.Info("seed config skipped", "reason", result.SkipReason)
+			}
+		}
+	}
 
 	// Start drain service
 	go func() {
