@@ -1,6 +1,6 @@
 <div align="center">
-  <h1>Beacon</h1>
-  <p><strong>PostgreSQL-native webhook delivery that just works</strong></p>
+  <h1>Beacon 📡</h1>
+  <p><strong>Watch Postgres data changes as webhooks, without the complexity.</strong></p>
 
 [![Go](https://img.shields.io/badge/Go-1.23+-00ADD8?style=flat-square&logo=go)](https://go.dev)
 [![PostgreSQL](https://img.shields.io/badge/PostgreSQL-14+-336791?style=flat-square&logo=postgresql)](https://postgresql.org)
@@ -25,43 +25,40 @@ Insert a row, Beacon delivers a webhook. Update a row, Beacon delivers a webhook
 ## Why Beacon?
 
 ```
-                                         Simple
-                                            ↑
-                                            │
-                                            │
-         ● pg_net                           │                                    ● Beacon
-           HTTP from SQL, no retries        │          Single binary, just Postgres
-                                            │
-         ● LISTEN/NOTIFY                    │
-           Built-in pub/sub, no persistence │
-                                            │
- Fragile ───────────────────────────────────┼─────────────────────────────────────────── Reliable
-                                            │
-                                            │                                ● Hasura
-                                            │                  GraphQL platform with triggers
-                                            │
-                                            │                                ● Supabase
-                                            │                  BaaS with webhook support
-                                            │
-                                            │                        ● Debezium + Kafka
-                                            │          CDC via WAL, Kafka ecosystem
-                                            │
-                                            ↓
-                                         Complex
+                                              Simple
+                                                 ↑
+                                                 │                     ● Beacon
+                                                 │                     Single binary, just Postgres
+                                                 │
+                                                 │
+                                                 │
+                                                 │
+                                                 │
+  Fragile ───────────────────────────────────────┼───────────────────────────────────────── Reliable
+                                                 │
+     ● LISTEN/NOTIFY                             │          ● Hasura or Supabase
+       Built-in, no persistence                  │            Full BaaS platform
+                                                 │
+     ● pg_net                                    │
+       HTTP from SQL, no retries                 │
+                                                 │                                 ● Debezium + Kafka
+                                                 │                                   Complex ops, Kafka ecosystem
+                                                 ↓
+                                              Complex
 ```
 
-| Solution | Complexity | Reliability | Self-Hosted | Platform Lock-in |
-|----------|:----------:|:-----------:|:-----------:|:----------------:|
-| **Beacon** | Low | High | Yes | None |
-| Debezium + Kafka | Very High | Very High | Yes | None |
-| Hasura Events | Medium | High | Yes | Hasura |
-| Supabase Webhooks | Medium | High | Partial | Supabase |
-| pg_net | Low | Low | Yes | None |
-| LISTEN/NOTIFY | Very Low | Very Low | Yes | None |
+| Solution          | Complexity | Reliability | Self-Hosted | Platform Lock-in |
+| ----------------- | :--------: | :---------: | :---------: | :--------------: |
+| **Beacon**        |    Low     |    High     |     Yes     |       None       |
+| Debezium + Kafka  | Very High  |  Very High  |     Yes     |       None       |
+| Hasura Events     |   Medium   |    High     |     Yes     |      Hasura      |
+| Supabase Webhooks |   Medium   |    High     |   Partial   |     Supabase     |
+| pg_net            |    Low     |     Low     |     Yes     |       None       |
+| LISTEN/NOTIFY     |  Very Low  |  Very Low   |     Yes     |       None       |
 
-**Good fit:** You want database-driven webhooks without adopting a platform, need transactional guarantees, and prefer a single self-hosted binary over Kafka infrastructure.
+**Consider Beacon if:** You want database-driven webhooks without adopting a platform, need transactional guarantees, and prefer a single self-hosted binary over Kafka infrastructure.
 
-**Not ideal:** Non-PostgreSQL databases, extreme scale (10k+ writes/sec), exactly-once delivery requirements, or you're already happy with Hasura/Supabase.
+**Don't consider Beacon if:** Non-PostgreSQL databases, extreme scale (10k+ writes/sec), exactly-once delivery requirements, or you're already using with Hasura/Supabase anyway.
 
 ## Quick Start
 
@@ -114,20 +111,20 @@ Beacon installs PostgreSQL triggers on your tables. When rows change, webhooks f
 
 ### Environment Variables
 
-| Variable | Description | Default |
-|----------|-------------|---------|
-| `DATABASE_URL` | PostgreSQL connection string | required |
-| `BEACON_API_KEY` | Control plane authentication | required |
-| `BEACON_HMAC_SECRET` | Webhook signing secret | optional |
-| `BEACON_LOG_LEVEL` | Log level (debug, info, warn, error) | `info` |
-| `BEACON_LOG_FORMAT` | Log format (json, text) | `json` |
-| `BEACON_CONTROL_ADDR` | Control plane listen address | `:8080` |
-| `BEACON_POLL_INTERVAL` | Outbox polling interval | `100ms` |
-| `BEACON_BATCH_SIZE` | Events to claim per poll | `100` |
-| `BEACON_WORKERS` | Concurrent delivery workers | `10` |
-| `BEACON_RETENTION_HOURS` | Retention period for delivered events | `168` (7 days) |
-| `BEACON_JANITOR_INTERVAL` | Cleanup interval | `1h` |
-| `BEACON_JANITOR_BATCH_SIZE` | Max events cleaned per cycle | `1000` |
+| Variable                    | Description                           | Default        |
+| --------------------------- | ------------------------------------- | -------------- |
+| `DATABASE_URL`              | PostgreSQL connection string          | required       |
+| `BEACON_API_KEY`            | Control plane authentication          | required       |
+| `BEACON_HMAC_SECRET`        | Webhook signing secret                | optional       |
+| `BEACON_LOG_LEVEL`          | Log level (debug, info, warn, error)  | `info`         |
+| `BEACON_LOG_FORMAT`         | Log format (json, text)               | `json`         |
+| `BEACON_CONTROL_ADDR`       | Control plane listen address          | `:8080`        |
+| `BEACON_POLL_INTERVAL`      | Outbox polling interval               | `100ms`        |
+| `BEACON_BATCH_SIZE`         | Events to claim per poll              | `100`          |
+| `BEACON_WORKERS`            | Concurrent delivery workers           | `10`           |
+| `BEACON_RETENTION_HOURS`    | Retention period for delivered events | `168` (7 days) |
+| `BEACON_JANITOR_INTERVAL`   | Cleanup interval                      | `1h`           |
+| `BEACON_JANITOR_BATCH_SIZE` | Max events cleaned per cycle          | `1000`         |
 
 ### Webhook Payload
 
@@ -141,9 +138,9 @@ Beacon sends a JSON payload for each event:
     "table": "orders",
     "operation": "INSERT"
   },
-  "pk": {"id": 42},
+  "pk": { "id": 42 },
   "old": null,
-  "new": {"id": 42, "status": "pending", "total": 99.99}
+  "new": { "id": 42, "status": "pending", "total": 99.99 }
 }
 ```
 
@@ -219,22 +216,22 @@ Beacon scales horizontally. Run multiple instances against the same database—n
 destinations:
   - name: slow-service
     url: https://slow.example.com/webhook
-    max_in_flight: 10  # Max concurrent requests to this destination
+    max_in_flight: 10 # Max concurrent requests to this destination
 ```
 
 ## Metrics
 
 Beacon exposes Prometheus metrics at `/metrics`:
 
-| Metric | Type | Description |
-|--------|------|-------------|
-| `beacon_delivery_total` | counter | Deliveries by destination and status |
-| `beacon_delivery_duration_seconds` | histogram | Delivery latency (p50, p95, p99) |
-| `beacon_dead_letters_total` | counter | Events that exhausted retries |
-| `beacon_outbox_depth` | gauge | Current event count by state |
-| `beacon_workers_active` | gauge | Active worker goroutines |
-| `beacon_events_reaped_total` | counter | Events recovered from crashed workers |
-| `beacon_events_cleaned_total` | counter | Old events cleaned by janitor |
+| Metric                             | Type      | Description                           |
+| ---------------------------------- | --------- | ------------------------------------- |
+| `beacon_delivery_total`            | counter   | Deliveries by destination and status  |
+| `beacon_delivery_duration_seconds` | histogram | Delivery latency (p50, p95, p99)      |
+| `beacon_dead_letters_total`        | counter   | Events that exhausted retries         |
+| `beacon_outbox_depth`              | gauge     | Current event count by state          |
+| `beacon_workers_active`            | gauge     | Active worker goroutines              |
+| `beacon_events_reaped_total`       | counter   | Events recovered from crashed workers |
+| `beacon_events_cleaned_total`      | counter   | Old events cleaned by janitor         |
 
 **Recommended alerts:**
 
