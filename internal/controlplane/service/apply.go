@@ -5,6 +5,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"log/slog"
 
 	"beacon/internal/capture"
 	"beacon/internal/config"
@@ -18,13 +19,15 @@ import (
 type ApplyService struct {
 	pool      *db.Pool
 	installer *capture.Installer
+	logger    *slog.Logger
 }
 
 // NewApplyService creates an ApplyService.
-func NewApplyService(pool *db.Pool, installer *capture.Installer) *ApplyService {
+func NewApplyService(pool *db.Pool, installer *capture.Installer, logger *slog.Logger) *ApplyService {
 	return &ApplyService{
 		pool:      pool,
 		installer: installer,
+		logger:    logger.With("component", "apply"),
 	}
 }
 
@@ -44,6 +47,11 @@ type ChangeSet struct {
 
 // Apply applies a configuration, returning changes made.
 func (s *ApplyService) Apply(ctx context.Context, cfg *config.BeaconConfig) (*ApplyResult, error) {
+	s.logger.Debug("applying configuration",
+		"destinations", len(cfg.Destinations),
+		"subscriptions", len(cfg.Subscriptions),
+	)
+
 	var result ApplyResult
 
 	err := s.pool.WithTx(ctx, func(tx pgx.Tx) error {
@@ -91,11 +99,27 @@ func (s *ApplyService) Apply(ctx context.Context, cfg *config.BeaconConfig) (*Ap
 	}
 	result.Triggers = triggerChanges
 
+	s.logger.Info("configuration applied",
+		"destinations_created", len(result.Destinations.Created),
+		"destinations_updated", len(result.Destinations.Updated),
+		"destinations_deleted", len(result.Destinations.Deleted),
+		"subscriptions_created", len(result.Subscriptions.Created),
+		"subscriptions_updated", len(result.Subscriptions.Updated),
+		"subscriptions_deleted", len(result.Subscriptions.Deleted),
+		"triggers_created", len(result.Triggers.Created),
+		"triggers_deleted", len(result.Triggers.Deleted),
+	)
+
 	return &result, nil
 }
 
 // DryRun computes what Apply would do without making changes.
 func (s *ApplyService) DryRun(ctx context.Context, cfg *config.BeaconConfig) (*ApplyResult, error) {
+	s.logger.Debug("dry run configuration",
+		"destinations", len(cfg.Destinations),
+		"subscriptions", len(cfg.Subscriptions),
+	)
+
 	var result ApplyResult
 
 	// Load current state (read-only)
