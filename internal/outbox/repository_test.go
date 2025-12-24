@@ -2,6 +2,8 @@ package outbox_test
 
 import (
 	"context"
+	"io"
+	"log/slog"
 	"testing"
 	"time"
 
@@ -12,6 +14,11 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
+
+// testLogger returns a discard logger for tests.
+func testLogger() *slog.Logger {
+	return slog.New(slog.NewTextHandler(io.Discard, nil))
+}
 
 var testContainer *testutil.PostgresContainer
 
@@ -49,7 +56,7 @@ func setupTest(t *testing.T) (*outbox.Repository, func()) {
 	`)
 	require.NoError(t, err)
 
-	repo := outbox.New(testContainer.Pool)
+	repo := outbox.New(testContainer.Pool, testLogger())
 	return repo, func() {}
 }
 

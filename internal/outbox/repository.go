@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"log/slog"
 	"time"
 
 	"beacon/internal/db"
@@ -14,17 +15,26 @@ import (
 
 // Repository handles outbox database operations.
 type Repository struct {
-	pool *db.Pool
+	pool   *db.Pool
+	logger *slog.Logger
 }
 
 // New creates a Repository.
-func New(pool *db.Pool) *Repository {
-	return &Repository{pool: pool}
+func New(pool *db.Pool, logger *slog.Logger) *Repository {
+	return &Repository{
+		pool:   pool,
+		logger: logger.With("component", "outbox"),
+	}
 }
 
 // Claim atomically claims up to `limit` pending events for `workerID`.
 // Returns events with their destination info.
 func (r *Repository) Claim(ctx context.Context, workerID string, limit int) ([]ClaimedEvent, error) {
+	r.logger.Debug("claiming events",
+		"worker_id", workerID,
+		"limit", limit,
+	)
+
 	rows, err := r.pool.Query(ctx, `
 		WITH claimed AS (
 			SELECT e.id
@@ -135,6 +145,13 @@ func (r *Repository) Claim(ctx context.Context, workerID string, limit int) ([]C
 		return nil, fmt.Errorf("iterate claimed events: %w", err)
 	}
 
+	if len(result) > 0 {
+		r.logger.Debug("claimed events",
+			"worker_id", workerID,
+			"count", len(result),
+		)
+	}
+
 	return result, nil
 }
 
@@ -151,6 +168,10 @@ func (r *Repository) Ack(ctx context.Context, eventID uuid.UUID) error {
 	if err != nil {
 		return fmt.Errorf("ack event: %w", err)
 	}
+
+	r.logger.Debug("event acknowledged",
+		"event_id", eventID,
+	)
 	return nil
 }
 
@@ -169,12 +190,18 @@ func (r *Repository) Reschedule(ctx context.Context, eventID uuid.UUID, visibleA
 	if err != nil {
 		return fmt.Errorf("reschedule event: %w", err)
 	}
+
+	r.logger.Debug("event rescheduled",
+		"event_id", eventID,
+		"visible_at", visibleAt,
+		"error", errMsg,
+	)
 	return nil
 }
 
 // ToDead moves an event to the dead-letter queue.
 func (r *Repository) ToDead(ctx context.Context, eventID uuid.UUID, reason string) error {
-	return r.pool.WithTx(ctx, func(tx pgx.Tx) error {
+	err := r.pool.WithTx(ctx, func(tx pgx.Tx) error {
 		// Insert snapshot into dead_letters
 		_, err := tx.Exec(ctx, `
 			INSERT INTO beacon.dead_letters (event_id, reason, snapshot)
@@ -222,6 +249,14 @@ func (r *Repository) ToDead(ctx context.Context, eventID uuid.UUID, reason strin
 
 		return nil
 	})
+
+	if err == nil {
+		r.logger.Info("event moved to dead letter queue",
+			"event_id", eventID,
+			"reason", reason,
+		)
+	}
+	return err
 }
 
 // RecordAttempt logs a delivery attempt for audit.

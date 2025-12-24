@@ -5,6 +5,7 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"log/slog"
 	"net"
 	"net/http"
 	"strconv"
@@ -21,11 +22,12 @@ type Client struct {
 	ssrfGuard  *SSRFGuard
 	signer     *Signer
 	hmacSecret []byte
+	logger     *slog.Logger
 }
 
 // NewClient creates a Client with the global HMAC signing secret.
 // Pass nil to disable request signing.
-func NewClient(hmacSecret []byte) *Client {
+func NewClient(hmacSecret []byte, logger *slog.Logger) *Client {
 	transport := &http.Transport{
 		DialContext: (&net.Dialer{
 			Timeout:   5 * time.Second,
@@ -49,6 +51,7 @@ func NewClient(hmacSecret []byte) *Client {
 		ssrfGuard:  NewSSRFGuard(),
 		signer:     NewSigner(),
 		hmacSecret: hmacSecret,
+		logger:     logger.With("component", "httpdeliver"),
 	}
 }
 
@@ -59,6 +62,8 @@ func (c *Client) Deliver(
 	dest outbox.Destination,
 	event outbox.Event,
 ) (*int, map[string]string, error) {
+	startTime := time.Now()
+
 	// 1. SSRF check
 	var checker PolicyChecker = c.ssrfGuard
 	if policy := ParseSSRFPolicy(dest.SSRFPolicy); policy != nil {
@@ -67,8 +72,18 @@ func (c *Client) Deliver(
 
 	safeURL, err := checker.CheckURL(ctx, dest.URL)
 	if err != nil {
+		c.logger.Debug("SSRF check blocked URL",
+			"url", dest.URL,
+			"destination", dest.Name,
+			"error", err,
+		)
 		return nil, nil, fmt.Errorf("SSRF blocked: %w", err)
 	}
+
+	c.logger.Debug("SSRF check passed",
+		"url", safeURL,
+		"destination", dest.Name,
+	)
 
 	// 2. Use payload directly (already JSON)
 	body := []byte(event.Payload)
@@ -97,6 +112,9 @@ func (c *Client) Deliver(
 		for k, v := range sigHeaders {
 			req.Header.Set(k, v)
 		}
+		c.logger.Debug("added HMAC signature to request",
+			"event_id", event.ID,
+		)
 	}
 
 	// 6. Apply timeout
@@ -108,9 +126,24 @@ func (c *Client) Deliver(
 	defer cancel()
 	req = req.WithContext(ctx)
 
+	c.logger.Debug("sending HTTP request",
+		"method", dest.Method,
+		"url", safeURL,
+		"event_id", event.ID,
+		"attempt", event.Attempts,
+		"timeout_ms", timeout.Milliseconds(),
+		"payload_size", len(body),
+	)
+
 	// 7. Execute request
 	resp, err := c.httpClient.Do(req)
 	if err != nil {
+		c.logger.Debug("HTTP request failed",
+			"event_id", event.ID,
+			"destination", dest.Name,
+			"error", err,
+			"duration_ms", time.Since(startTime).Milliseconds(),
+		)
 		return nil, nil, err
 	}
 	defer resp.Body.Close()
@@ -123,6 +156,13 @@ func (c *Client) Deliver(
 	for k := range resp.Header {
 		respHeaders[k] = resp.Header.Get(k)
 	}
+
+	c.logger.Debug("HTTP request completed",
+		"event_id", event.ID,
+		"destination", dest.Name,
+		"status_code", resp.StatusCode,
+		"duration_ms", time.Since(startTime).Milliseconds(),
+	)
 
 	return &resp.StatusCode, respHeaders, nil
 }

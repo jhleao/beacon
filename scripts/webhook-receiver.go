@@ -7,7 +7,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
-	"log"
+	"log/slog"
 	"math/rand"
 	"net/http"
 	"os"
@@ -16,6 +16,10 @@ import (
 )
 
 func main() {
+	logger := slog.New(slog.NewTextHandler(os.Stdout, &slog.HandlerOptions{
+		Level: slog.LevelDebug,
+	}))
+
 	port := os.Getenv("PORT")
 	if port == "" {
 		port = "9000"
@@ -26,28 +30,36 @@ func main() {
 	http.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
 		body, _ := io.ReadAll(r.Body)
 
-		// Log request
-		log.Printf("[%s] %s %s", r.Method, r.URL.Path, r.RemoteAddr)
-		log.Printf("  Headers:")
+		// Collect Beacon headers
+		beaconHeaders := make(map[string]string)
 		for k, v := range r.Header {
 			if len(k) > 6 && k[:6] == "Beacon" {
-				log.Printf("    %s: %s", k, v[0])
+				beaconHeaders[k] = v[0]
 			}
 		}
 
 		// Pretty print JSON body
+		var bodyStr string
 		var pretty map[string]any
 		if json.Unmarshal(body, &pretty) == nil {
-			formatted, _ := json.MarshalIndent(pretty, "  ", "  ")
-			log.Printf("  Body:\n  %s", formatted)
+			formatted, _ := json.MarshalIndent(pretty, "", "  ")
+			bodyStr = string(formatted)
 		} else {
-			log.Printf("  Body: %s", body)
+			bodyStr = string(body)
 		}
+
+		logger.Info("request received",
+			"method", r.Method,
+			"path", r.URL.Path,
+			"remote", r.RemoteAddr,
+			"headers", beaconHeaders,
+			"body", bodyStr,
+		)
 
 		// Simulate failures
 		if failRate > 0 && rand.Intn(100) < failRate {
 			status := []int{500, 502, 503, 504}[rand.Intn(4)]
-			log.Printf("  -> Simulated failure: %d", status)
+			logger.Warn("simulated failure", "status", status)
 			w.WriteHeader(status)
 			fmt.Fprintf(w, `{"error": "simulated failure"}`)
 			return
@@ -57,7 +69,7 @@ func main() {
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusOK)
 		fmt.Fprintf(w, `{"received": true, "timestamp": "%s"}`, time.Now().Format(time.RFC3339))
-		log.Printf("  -> 200 OK")
+		logger.Debug("response sent", "status", 200)
 	})
 
 	// Slow endpoint for timeout testing
@@ -68,7 +80,7 @@ func main() {
 				delay = parsed
 			}
 		}
-		log.Printf("[%s] /slow - sleeping %s", r.Method, delay)
+		logger.Info("slow request", "method", r.Method, "delay", delay)
 		time.Sleep(delay)
 		w.WriteHeader(http.StatusOK)
 		fmt.Fprintf(w, `{"delayed": true}`)
@@ -76,23 +88,31 @@ func main() {
 
 	// Always fail endpoint
 	http.HandleFunc("/fail", func(w http.ResponseWriter, r *http.Request) {
-		log.Printf("[%s] /fail - returning 500", r.Method)
+		logger.Warn("fail endpoint hit", "method", r.Method)
 		w.WriteHeader(http.StatusInternalServerError)
 		fmt.Fprintf(w, `{"error": "always fails"}`)
 	})
 
 	// 4xx endpoint
 	http.HandleFunc("/bad-request", func(w http.ResponseWriter, r *http.Request) {
-		log.Printf("[%s] /bad-request - returning 400", r.Method)
+		logger.Warn("bad-request endpoint hit", "method", r.Method)
 		w.WriteHeader(http.StatusBadRequest)
 		fmt.Fprintf(w, `{"error": "bad request"}`)
 	})
 
-	log.Printf("Webhook receiver listening on :%s", port)
-	log.Printf("Endpoints:")
-	log.Printf("  /           - Echo (FAIL_RATE=%d%%)", failRate)
-	log.Printf("  /slow?delay=10s - Delayed response")
-	log.Printf("  /fail       - Always 500")
-	log.Printf("  /bad-request - Always 400")
-	log.Fatal(http.ListenAndServe(":"+port, nil))
+	logger.Info("webhook receiver starting",
+		"port", port,
+		"fail_rate", failRate,
+	)
+	logger.Info("endpoints",
+		"echo", "/",
+		"slow", "/slow?delay=10s",
+		"fail", "/fail",
+		"bad_request", "/bad-request",
+	)
+
+	if err := http.ListenAndServe(":"+port, nil); err != nil {
+		logger.Error("server failed", "error", err)
+		os.Exit(1)
+	}
 }

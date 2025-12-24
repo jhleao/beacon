@@ -100,10 +100,16 @@ func runServe() {
 	defer cancel()
 
 	logger.Info("starting beacon",
+		"version", version.Version,
 		"http_addr", envCfg.HTTPAddr,
 		"poll_interval", envCfg.PollInterval,
 		"batch_size", envCfg.BatchSize,
 		"worker_count", envCfg.WorkerCount,
+		"log_level", envCfg.LogLevel,
+		"log_format", envCfg.LogFormat,
+		"retention_hours", envCfg.RetentionHours,
+		"janitor_interval", envCfg.JanitorInterval,
+		"janitor_batch_size", envCfg.JanitorBatchSize,
 	)
 
 	// Connect to database
@@ -123,10 +129,16 @@ func runServe() {
 	}
 
 	// Create components
-	repo := outbox.New(pool)
+	repo := outbox.New(pool, logger)
 	installer := capture.New(pool)
 	hmacSecret := config.LoadHMACSecret()
-	client := httpdeliver.NewClient(hmacSecret)
+	client := httpdeliver.NewClient(hmacSecret, logger)
+
+	if len(hmacSecret) > 0 {
+		logger.Info("HMAC signing enabled")
+	} else {
+		logger.Debug("HMAC signing disabled (no secret configured)")
+	}
 
 	// Create dispatcher
 	dispatcherCfg := dispatcher.Config{
@@ -137,7 +149,7 @@ func runServe() {
 	disp := dispatcher.New(pool, repo, client, dispatcherCfg, logger)
 
 	// Create control plane
-	applySvc := service.NewApplyService(pool, installer)
+	applySvc := service.NewApplyService(pool, installer, logger)
 	drainSvc := service.NewDrainService(pool, logger)
 	apiServer := api.NewServer(pool, applySvc, envCfg.HTTPAddr, envCfg.ControlPlaneSecret, logger, metrics)
 

@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"io"
+	"log/slog"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -15,6 +16,11 @@ import (
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
 )
+
+// testLogger returns a discard logger for tests.
+func testLogger() *slog.Logger {
+	return slog.New(slog.NewTextHandler(io.Discard, nil))
+}
 
 // allowLocalhostPolicy returns SSRF policy JSON that allows localhost for testing.
 func allowLocalhostPolicy() json.RawMessage {
@@ -33,7 +39,7 @@ func TestClient_Deliver_Success(t *testing.T) {
 	}))
 	defer server.Close()
 
-	client := httpdeliver.NewClient(nil)
+	client := httpdeliver.NewClient(nil, testLogger())
 	dest := outbox.Destination{
 		ID:         uuid.New(),
 		URL:        server.URL,
@@ -76,7 +82,7 @@ func TestClient_Deliver_WithSigning(t *testing.T) {
 	defer server.Close()
 
 	secret := []byte("test-hmac-secret")
-	client := httpdeliver.NewClient(secret)
+	client := httpdeliver.NewClient(secret, testLogger())
 
 	dest := outbox.Destination{
 		ID:         uuid.New(),
@@ -104,7 +110,7 @@ func TestClient_Deliver_ServerError(t *testing.T) {
 	}))
 	defer server.Close()
 
-	client := httpdeliver.NewClient(nil)
+	client := httpdeliver.NewClient(nil, testLogger())
 	dest := outbox.Destination{URL: server.URL, Method: "POST", TimeoutMs: 5000, SSRFPolicy: allowLocalhostPolicy()}
 	event := outbox.Event{ID: uuid.New(), Payload: []byte(`{}`)}
 
@@ -121,7 +127,7 @@ func TestClient_Deliver_Timeout(t *testing.T) {
 	}))
 	defer server.Close()
 
-	client := httpdeliver.NewClient(nil)
+	client := httpdeliver.NewClient(nil, testLogger())
 	dest := outbox.Destination{URL: server.URL, Method: "POST", TimeoutMs: 100, SSRFPolicy: allowLocalhostPolicy()}
 	event := outbox.Event{ID: uuid.New(), Payload: []byte(`{}`)}
 
@@ -133,7 +139,7 @@ func TestClient_Deliver_Timeout(t *testing.T) {
 }
 
 func TestClient_Deliver_ConnectionRefused(t *testing.T) {
-	client := httpdeliver.NewClient(nil)
+	client := httpdeliver.NewClient(nil, testLogger())
 	dest := outbox.Destination{
 		URL:        "http://127.0.0.1:59999", // Nothing listening
 		Method:     "POST",
@@ -160,7 +166,7 @@ func TestClient_Deliver_NoRedirectFollow(t *testing.T) {
 	}))
 	defer server.Close()
 
-	client := httpdeliver.NewClient(nil)
+	client := httpdeliver.NewClient(nil, testLogger())
 	dest := outbox.Destination{URL: server.URL, Method: "POST", TimeoutMs: 5000, SSRFPolicy: allowLocalhostPolicy()}
 	event := outbox.Event{ID: uuid.New(), Payload: []byte(`{}`)}
 
@@ -180,7 +186,7 @@ func TestClient_Deliver_ResponseHeaders(t *testing.T) {
 	}))
 	defer server.Close()
 
-	client := httpdeliver.NewClient(nil)
+	client := httpdeliver.NewClient(nil, testLogger())
 	dest := outbox.Destination{URL: server.URL, Method: "POST", TimeoutMs: 5000, SSRFPolicy: allowLocalhostPolicy()}
 	event := outbox.Event{ID: uuid.New(), Payload: []byte(`{}`)}
 
