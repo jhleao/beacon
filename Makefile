@@ -1,4 +1,14 @@
-.PHONY: help up down logs migrate run test lint build clean seed webhook psql
+.PHONY: help up down logs migrate run test lint build clean seed webhook psql docker-build
+
+# Version info for builds
+VERSION ?= dev
+COMMIT := $(shell git rev-parse --short HEAD 2>/dev/null || echo "unknown")
+BUILD_DATE := $(shell date -u +%Y-%m-%dT%H:%M:%SZ)
+
+LDFLAGS := -s -w \
+	-X beacon/internal/version.Version=$(VERSION) \
+	-X beacon/internal/version.Commit=$(COMMIT) \
+	-X beacon/internal/version.BuildDate=$(BUILD_DATE)
 
 # Default target
 help:
@@ -56,7 +66,14 @@ run:
 	go run ./cmd/beacon serve
 
 build:
-	go build -o bin/beacon ./cmd/beacon
+	go build -ldflags "$(LDFLAGS)" -o bin/beacon ./cmd/beacon
+
+docker-build:
+	docker build \
+		--build-arg VERSION=$(VERSION) \
+		--build-arg COMMIT=$(COMMIT) \
+		--build-arg BUILD_DATE=$(BUILD_DATE) \
+		-t beacon:local .
 
 # Testing
 test:

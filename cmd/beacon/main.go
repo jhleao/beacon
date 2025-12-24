@@ -17,6 +17,7 @@ import (
 	"beacon/internal/httpdeliver"
 	"beacon/internal/observability"
 	"beacon/internal/outbox"
+	"beacon/internal/version"
 
 	"github.com/prometheus/client_golang/prometheus"
 )
@@ -33,6 +34,9 @@ func main() {
 		runServe()
 	case "migrate":
 		runMigrate()
+	case "version", "-v", "--version":
+		fmt.Printf("beacon %s (commit: %s, built: %s)\n",
+			version.Version, version.Commit, version.BuildDate)
 	case "help", "-h", "--help":
 		printUsage()
 	default:
@@ -51,6 +55,7 @@ Usage:
 Commands:
   serve     Start the Beacon server
   migrate   Run database migrations
+  version   Show version information
   help      Show this help message
 
 Environment Variables:
