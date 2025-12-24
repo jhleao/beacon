@@ -24,6 +24,9 @@ type EnvConfig struct {
 	RetentionHours    int
 	JanitorInterval   time.Duration
 	JanitorBatchSize  int
+
+	// Seed config for automatic bootstrapping
+	SeedConfigPath string
 }
 
 // LoadEnv loads configuration from environment variables.
@@ -43,6 +46,9 @@ func LoadEnv() (*EnvConfig, error) {
 		RetentionHours:   parseIntOr("BEACON_RETENTION_HOURS", 168),
 		JanitorInterval:  parseDurationOr("BEACON_JANITOR_INTERVAL", 1*time.Hour),
 		JanitorBatchSize: parseIntOr("BEACON_JANITOR_BATCH_SIZE", 1000),
+
+		// Seed config path (optional, for auto-bootstrapping)
+		SeedConfigPath: os.Getenv("BEACON_SEED_CONFIG_PATH"),
 	}
 
 	// Validate required fields
