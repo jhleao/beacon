@@ -22,6 +22,47 @@ Insert a row, Beacon delivers a webhook. Update a row, Beacon delivers a webhook
 - **SSRF protection** — Built-in safeguards against internal network attacks
 - **Observable** — Prometheus metrics and structured logging out of the box
 
+## Why Beacon?
+
+```
+                                         Simple
+                                            ↑
+                                            │
+                                            │
+         ● pg_net                           │                                    ● Beacon
+           HTTP from SQL, no retries        │          Single binary, just Postgres
+                                            │
+         ● LISTEN/NOTIFY                    │
+           Built-in pub/sub, no persistence │
+                                            │
+ Fragile ───────────────────────────────────┼─────────────────────────────────────────── Reliable
+                                            │
+                                            │                                ● Hasura
+                                            │                  GraphQL platform with triggers
+                                            │
+                                            │                                ● Supabase
+                                            │                  BaaS with webhook support
+                                            │
+                                            │                        ● Debezium + Kafka
+                                            │          CDC via WAL, Kafka ecosystem
+                                            │
+                                            ↓
+                                         Complex
+```
+
+| Solution | Complexity | Reliability | Self-Hosted | Platform Lock-in |
+|----------|:----------:|:-----------:|:-----------:|:----------------:|
+| **Beacon** | Low | High | Yes | None |
+| Debezium + Kafka | Very High | Very High | Yes | None |
+| Hasura Events | Medium | High | Yes | Hasura |
+| Supabase Webhooks | Medium | High | Partial | Supabase |
+| pg_net | Low | Low | Yes | None |
+| LISTEN/NOTIFY | Very Low | Very Low | Yes | None |
+
+**Good fit:** You want database-driven webhooks without adopting a platform, need transactional guarantees, and prefer a single self-hosted binary over Kafka infrastructure.
+
+**Not ideal:** Non-PostgreSQL databases, extreme scale (10k+ writes/sec), exactly-once delivery requirements, or you're already happy with Hasura/Supabase.
+
 ## Quick Start
 
 ### 1. Run Beacon
@@ -114,6 +155,10 @@ Beacon-Signature: sha256=abc123...
 
 Verify with: `HMAC-SHA256(timestamp + "." + body, secret)`
 
+### Schema Changes
+
+Beacon handles table schema changes automatically. Triggers use dynamic column introspection—no restart or reconfiguration needed when you add or remove columns.
+
 ## API
 
 ### Apply Configuration
@@ -158,6 +203,53 @@ GET /metrics  # Prometheus format
 2. **Claim** — Worker processes claim events using `FOR UPDATE SKIP LOCKED`
 3. **Deliver** — HTTP requests with retries, timeouts, and signing
 4. **Ack/Retry** — Success removes the event; failure schedules a retry with backoff
+
+## Scaling
+
+Beacon scales horizontally. Run multiple instances against the same database—no coordination required.
+
+- **Lock-free claiming** — Workers use `FOR UPDATE SKIP LOCKED` to claim events without blocking each other
+- **Crash recovery** — Heartbeat-based detection automatically reclaims events from dead workers within 30 seconds
+- **Per-destination limits** — `max_in_flight` prevents any single slow destination from consuming all workers
+
+```yaml
+destinations:
+  - name: slow-service
+    url: https://slow.example.com/webhook
+    max_in_flight: 10  # Max concurrent requests to this destination
+```
+
+## Metrics
+
+Beacon exposes Prometheus metrics at `/metrics`:
+
+| Metric | Type | Description |
+|--------|------|-------------|
+| `beacon_delivery_total` | counter | Deliveries by destination and status |
+| `beacon_delivery_duration_seconds` | histogram | Delivery latency (p50, p95, p99) |
+| `beacon_dead_letters_total` | counter | Events that exhausted retries |
+| `beacon_outbox_depth` | gauge | Current event count by state |
+| `beacon_workers_active` | gauge | Active worker goroutines |
+| `beacon_events_reaped_total` | counter | Events recovered from crashed workers |
+
+**Recommended alerts:**
+
+- `beacon_outbox_depth{state="pending"} > 10000` for 5min — backlog building
+- `beacon_dead_letters_total` increasing — destination issues
+- `beacon_workers_active == 0` — no workers processing
+
+## Maintenance
+
+Beacon doesn't auto-delete delivered events. Periodically clean up:
+
+```sql
+-- Remove delivered events older than 7 days
+DELETE FROM beacon.outbox_events
+WHERE state = 'delivered' AND created_at < now() - INTERVAL '7 days';
+
+-- Archive or inspect dead letters
+SELECT * FROM beacon.dead_letters WHERE created_at > now() - INTERVAL '1 day';
+```
 
 ## License
 
