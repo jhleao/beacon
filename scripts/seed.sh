@@ -30,7 +30,7 @@ CREATE TABLE IF NOT EXISTS public.orders (
 SQL
 
 echo "Applying Beacon config..."
-curl -s -X POST "http://${BEACON_URL}/v1/apply" \
+curl -s -X POST "http://${BEACON_URL}/apply" \
     -H "Authorization: Bearer ${SECRET}" \
     -H "Content-Type: application/x-yaml" \
     -d '
