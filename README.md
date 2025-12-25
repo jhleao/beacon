@@ -12,53 +12,43 @@
 
 ## About
 
-Beacon delivers webhooks from your PostgreSQL database changes. No message queues. No external dependencies. Just your existing Postgres.
+Beacon delivers webhooks from your PostgreSQL database changes. No message queues, no external dependencies, just your existing Postgres.
 
-Insert a row, Beacon delivers a webhook. Update a row, Beacon delivers a webhook. It's that simple.
+Events are captured in the same transaction as your data changes, delivered with automatic retries (exponential backoff with jitter, configurable max attempts), preserved in a DLQ when delivery ultimately fails (with full context for debugging), and exposed with Prometheus metrics and structured logging.
 
-- **Transactional guarantees** — Events are captured in the same transaction as your data changes
-- **Automatic retries** — Exponential backoff with jitter, configurable max attempts
-- **Dead letter queue** — Failed events are preserved with full context for debugging
-- **SSRF protection** — Built-in safeguards against internal network attacks
-- **Observable** — Prometheus metrics and structured logging out of the box
+Build real-time integrations, event-driven workflows, audit logs, and cross-system sync powered by your existing PostgreSQL writes, with zero adoption hassle.
 
-## Why Beacon?
+## Why does this exist?
+
+Beacon fills the gap between “just use Postgres” hacks (like LISTEN/NOTIFY or bespoke HTTP-in-SQL) and heavyweight CDC stacks (like Debezium + Kafka). If you want reliable, transactional change-to-webhook delivery but you don’t want to adopt a BaaS or SaaS, Beacon is the middle path.
 
 ```
-                                              Simple
-                                                 ↑
-                                                 │                     ● Beacon
-                                                 │                     Single binary, just Postgres
-                                                 │
-                                                 │
-                                                 │
-                                                 │
-                                                 │
-  Fragile ───────────────────────────────────────┼───────────────────────────────────────── Reliable
-                                                 │
-     ● LISTEN/NOTIFY                             │          ● Hasura or Supabase
-       Built-in, no persistence                  │            Full BaaS platform
-                                                 │
-     ● pg_net                                    │
-       HTTP from SQL, no retries                 │
-                                                 │                                 ● Debezium + Kafka
-                                                 │                                   Complex ops, Kafka ecosystem
-                                                 ↓
-                                              Complex
+                              Simple
+                                 ↑
+                                 │       ● Beacon
+                                 │
+                                 │
+                                 │
+                                 │
+  Fragile ───────────────────────┼─────────────────────────-─ Reliable
+                                 │
+                                 │       ● Hasura / Supabase
+                                 │       ● Prisma Pulse
+     ● LISTEN/NOTIFY             │
+     ● pg_net                    │                  ● Debezium + Kafka
+                                 ↓
+                              Complex
 ```
 
-| Solution          | Complexity | Reliability | Self-Hosted | Platform Lock-in |
-| ----------------- | :--------: | :---------: | :---------: | :--------------: |
-| **Beacon**        |    Low     |    High     |     Yes     |       None       |
-| Debezium + Kafka  | Very High  |  Very High  |     Yes     |       None       |
-| Hasura Events     |   Medium   |    High     |     Yes     |      Hasura      |
-| Supabase Webhooks |   Medium   |    High     |   Partial   |     Supabase     |
-| pg_net            |    Low     |     Low     |     Yes     |       None       |
-| LISTEN/NOTIFY     |  Very Low  |  Very Low   |     Yes     |       None       |
-
-**Consider Beacon if:** You want database-driven webhooks without adopting a platform, need transactional guarantees, and prefer a single self-hosted binary over Kafka infrastructure.
-
-**Don't consider Beacon if:** Non-PostgreSQL databases, extreme scale (10k+ writes/sec), exactly-once delivery requirements, or you're already using with Hasura/Supabase anyway.
+| Product           | Requirements          | Model    | Consider if                                                      |
+| ----------------- | --------------------- | -------- | ---------------------------------------------------------------- |
+| **Beacon**        | One Docker container  | OSS      | Can host a Docker container; Single binary, below 10k writes/sec |
+| Debezium + Kafka  | Kafka infrastructure  | OSS      | Enterprise-scale; already using Kafka; multi-system streaming;   |
+| Hasura Events     | Adoption of BaaS      | OSS/SaaS | Already using Hasura BaaS                                        |
+| Supabase Webhooks | Adoption of BaaS      | OSS/SaaS | Already using Supabase BaaS                                      |
+| Prisma Pulse      | Prisma ORM at runtime | SaaS     | Already using Prisma ORM + prefer a managed service              |
+| pg_net            | Handroll everything   | OSS      | -                                                                |
+| LISTEN/NOTIFY     | Handroll everything   | OSS      | -                                                                |
 
 ## Quick Start
 
@@ -144,6 +134,35 @@ Beacon sends a JSON payload for each event:
 }
 ```
 
+## How It Works
+
+```
+┌─────────────┐     ┌──────────────┐     ┌─────────────┐
+│ Your App    │────▶│  PostgreSQL  │────▶│   Beacon    │────▶ Webhooks
+│             │     │  + Triggers  │     │  Dispatcher │
+└─────────────┘     └──────────────┘     └─────────────┘
+```
+
+1. **Capture** — PostgreSQL triggers write events to an outbox table (same transaction as your data)
+2. **Claim** — Worker processes claim events using `FOR UPDATE SKIP LOCKED`
+3. **Deliver** — HTTP requests with retries, timeouts, and signing
+4. **Ack/Retry** — Success removes the event; failure schedules a retry with backoff
+
+## Scaling
+
+Beacon scales horizontally. Run multiple instances against the same database. No extra coordination required.
+
+- **Lock-free claiming** — Workers use `FOR UPDATE SKIP LOCKED` to claim events without blocking each other
+- **Crash recovery** — Heartbeat-based detection automatically reclaims events from dead workers within 30 seconds
+- **Per-destination limits** — `max_in_flight` prevents any single slow destination from consuming all workers
+
+```yaml
+destinations:
+  - name: slow-service
+    url: https://slow.example.com/webhook
+    max_in_flight: 10 # Max concurrent requests to this destination
+```
+
 ### Request Signing
 
 When `BEACON_HMAC_SECRET` is set, Beacon signs requests:
@@ -155,11 +174,25 @@ Beacon-Signature: sha256=abc123...
 
 Verify with: `HMAC-SHA256(timestamp + "." + body, secret)`
 
-### Schema Changes
+### Persistence and Schema
 
-Beacon handles table schema changes automatically. Triggers use dynamic column introspection—no restart or reconfiguration needed when you add or remove columns.
+Beacon persists its own configuration and delivery state inside your Postgres database under a dedicated `beacon` schema. This is created and migrated automatically on startup.
 
-## API
+| Table                      | Purpose                                     |
+| -------------------------- | ------------------------------------------- |
+| `beacon.schema_version`    | Tracks applied migrations                   |
+| `beacon.destinations`      | Webhook endpoints + delivery settings       |
+| `beacon.subscriptions`     | Table/operation → destination routing rules |
+| `beacon.outbox_events`     | Transactional outbox queue + delivery state |
+| `beacon.delivery_attempts` | Delivery attempt audit log                  |
+| `beacon.dead_letters`      | Exhausted-retry events + snapshot           |
+| `beacon.worker_heartbeats` | Worker liveness for recovery                |
+
+Schema changes to your application tables are handled automatically: the trigger function uses dynamic column introspection, so adding/removing columns doesn’t require restarting Beacon or reinstalling triggers.
+
+## Control Plane HTTP API
+
+> All endpoints except `GET /health` require an `Authorization: Bearer <token>` header. Beacon validates this token against `BEACON_CONTROLPLANE_SECRET`. Missing/invalid tokens receive `401 Unauthorized`.
 
 ### Apply Configuration
 
@@ -187,41 +220,26 @@ GET /health
 ### Metrics
 
 ```bash
-GET /metrics  # Prometheus format
+GET /metrics  # Prometheus format (authenticated)
 ```
 
-## How It Works
+## Maintenance
 
-```
-┌─────────────┐     ┌──────────────┐     ┌─────────────┐
-│ Your App    │────▶│  PostgreSQL  │────▶│   Beacon    │────▶ Webhooks
-│             │     │  + Triggers  │     │  Dispatcher │
-└─────────────┘     └──────────────┘     └─────────────┘
-```
+Beacon automatically cleans up delivered events older than the retention period (default: 7 days). Configure with `BEACON_RETENTION_HOURS`.
 
-1. **Capture** — PostgreSQL triggers write events to an outbox table (same transaction as your data)
-2. **Claim** — Worker processes claim events using `FOR UPDATE SKIP LOCKED`
-3. **Deliver** — HTTP requests with retries, timeouts, and signing
-4. **Ack/Retry** — Success removes the event; failure schedules a retry with backoff
+Dead letters are preserved for manual review:
 
-## Scaling
+```sql
+-- Inspect recent dead letters
+SELECT * FROM beacon.dead_letters WHERE dead_at > now() - INTERVAL '1 day';
 
-Beacon scales horizontally. Run multiple instances against the same database—no coordination required.
-
-- **Lock-free claiming** — Workers use `FOR UPDATE SKIP LOCKED` to claim events without blocking each other
-- **Crash recovery** — Heartbeat-based detection automatically reclaims events from dead workers within 30 seconds
-- **Per-destination limits** — `max_in_flight` prevents any single slow destination from consuming all workers
-
-```yaml
-destinations:
-  - name: slow-service
-    url: https://slow.example.com/webhook
-    max_in_flight: 10 # Max concurrent requests to this destination
+-- Archive old dead letters (manual)
+DELETE FROM beacon.dead_letters WHERE dead_at < now() - INTERVAL '30 days';
 ```
 
 ## Metrics
 
-Beacon exposes Prometheus metrics at `/metrics`:
+Beacon exposes Prometheus metrics at `/metrics` (authenticated with `Authorization: Bearer $BEACON_CONTROLPLANE_SECRET`):
 
 | Metric                             | Type      | Description                           |
 | ---------------------------------- | --------- | ------------------------------------- |
@@ -239,18 +257,12 @@ Beacon exposes Prometheus metrics at `/metrics`:
 - `beacon_dead_letters_total` increasing — destination issues
 - `beacon_workers_active == 0` — no workers processing
 
-## Maintenance
+Example:
 
-Beacon automatically cleans up delivered events older than the retention period (default: 7 days). Configure with `BEACON_RETENTION_HOURS`.
-
-Dead letters are preserved for manual review:
-
-```sql
--- Inspect recent dead letters
-SELECT * FROM beacon.dead_letters WHERE dead_at > now() - INTERVAL '1 day';
-
--- Archive old dead letters (manual)
-DELETE FROM beacon.dead_letters WHERE dead_at < now() - INTERVAL '30 days';
+```bash
+curl -sS \
+  -H "Authorization: Bearer $BEACON_CONTROLPLANE_SECRET" \
+  http://localhost:8080/metrics
 ```
 
 ## License
