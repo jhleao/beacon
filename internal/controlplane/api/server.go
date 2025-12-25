@@ -54,9 +54,9 @@ func NewServer(
 func (s *Server) routes() {
 	// Public endpoints (no auth)
 	s.mux.HandleFunc("GET /health", s.handleHealth)
-	s.mux.HandleFunc("GET /metrics", s.handleMetrics)
 
 	// Protected endpoints
+	s.mux.HandleFunc("GET /metrics", s.authRequired(s.handleMetrics))
 	s.mux.HandleFunc("POST /apply", s.authRequired(s.handleApply))
 	s.mux.HandleFunc("GET /config", s.authRequired(s.handleGetConfig))
 	s.mux.HandleFunc("POST /validate", s.authRequired(s.handleValidate))
