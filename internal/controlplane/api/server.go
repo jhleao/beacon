@@ -316,7 +316,7 @@ func (s *Server) handleListSubscriptions(w http.ResponseWriter, r *http.Request)
 func (s *Server) writeJSON(w http.ResponseWriter, status int, data any) {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(status)
-	json.NewEncoder(w).Encode(data)
+	_ = json.NewEncoder(w).Encode(data)
 }
 
 func (s *Server) writeError(w http.ResponseWriter, status int, message string) {

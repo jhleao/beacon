@@ -55,10 +55,8 @@ func (s *ApplyService) Apply(ctx context.Context, cfg *config.BeaconConfig) (*Ap
 	var result ApplyResult
 
 	err := s.pool.WithTx(ctx, func(tx pgx.Tx) error {
-		// Lock destinations table to prevent concurrent modifications
-		if _, err := tx.Exec(ctx, `SELECT 1 FROM beacon.destinations FOR UPDATE`); err != nil {
-			// Table might be empty, that's fine
-		}
+		// Lock destinations table to prevent concurrent modifications (empty table is fine)
+		_, _ = tx.Exec(ctx, `SELECT 1 FROM beacon.destinations FOR UPDATE`)
 
 		// 1. Load current state
 		currentDests, err := s.loadDestinations(ctx, tx)
@@ -205,7 +203,7 @@ func (s *ApplyService) Export(ctx context.Context) (*config.BeaconConfig, error)
 		}
 
 		if len(headers) > 0 && string(headers) != "{}" {
-			json.Unmarshal(headers, &dest.Headers)
+			_ = json.Unmarshal(headers, &dest.Headers)
 		}
 		if len(ssrfPolicy) > 0 && string(ssrfPolicy) != "{}" {
 			var policy config.SSRFPolicy

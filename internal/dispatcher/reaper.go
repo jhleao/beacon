@@ -24,16 +24,8 @@ func (d *Dispatcher) reaperLoop(ctx context.Context) {
 }
 
 func (d *Dispatcher) reapStaleWorkers(ctx context.Context) {
-	// Find stale workers
-	rows, err := d.pool.Exec(ctx, `
-		SELECT worker_id FROM beacon.worker_heartbeats
-		WHERE last_heartbeat < now() - $1::interval
-	`, StaleThreshold.String())
-	_ = rows // Using Exec which doesn't return rows, but we need to get IDs first
-
-	// Actually, let me rewrite this properly
 	var staleCount int64
-	err = d.pool.QueryRow(ctx, `
+	err := d.pool.QueryRow(ctx, `
 		WITH stale AS (
 			SELECT worker_id FROM beacon.worker_heartbeats
 			WHERE last_heartbeat < now() - $1::interval

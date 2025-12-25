@@ -40,7 +40,7 @@ func (s *ApplyService) loadDestinations(ctx context.Context, tx pgx.Tx) (map[str
 			return nil, err
 		}
 		if len(headers) > 0 {
-			json.Unmarshal(headers, &d.Headers)
+			_ = json.Unmarshal(headers, &d.Headers)
 		}
 		d.SSRFPolicy = ssrf
 		result[d.Name] = d
