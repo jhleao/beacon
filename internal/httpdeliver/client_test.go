@@ -35,7 +35,7 @@ func TestClient_Deliver_Success(t *testing.T) {
 		receivedHeaders = r.Header
 		receivedBody, _ = io.ReadAll(r.Body)
 		w.WriteHeader(200)
-		w.Write([]byte(`{"ok":true}`))
+		_, _ = w.Write([]byte(`{"ok":true}`))
 	}))
 	defer server.Close()
 
@@ -96,7 +96,7 @@ func TestClient_Deliver_WithSigning(t *testing.T) {
 		Payload: []byte(`{"data":"test"}`),
 	}
 
-	client.Deliver(context.Background(), dest, event)
+	_, _, _ = client.Deliver(context.Background(), dest, event)
 
 	// Verify signing headers present
 	assert.NotEmpty(t, receivedHeaders.Get("Beacon-Timestamp"))
@@ -106,7 +106,7 @@ func TestClient_Deliver_WithSigning(t *testing.T) {
 func TestClient_Deliver_ServerError(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(503)
-		w.Write([]byte("Service Unavailable"))
+		_, _ = w.Write([]byte("Service Unavailable"))
 	}))
 	defer server.Close()
 

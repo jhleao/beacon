@@ -26,7 +26,7 @@ func TestTriggerCapture_E2E(t *testing.T) {
 	`)
 	require.NoError(t, err)
 	defer func() {
-		testContainer.Pool.Exec(ctx, "DROP TABLE public.users_e2e CASCADE")
+		_, _ = testContainer.Pool.Exec(ctx, "DROP TABLE public.users_e2e CASCADE")
 	}()
 
 	// Create destination and subscription
@@ -48,7 +48,7 @@ func TestTriggerCapture_E2E(t *testing.T) {
 	installer := capture.New(testContainer.Pool)
 	err = installer.InstallTrigger(ctx, "public", "users_e2e")
 	require.NoError(t, err)
-	defer installer.UninstallTrigger(ctx, "public", "users_e2e")
+	defer func() { _ = installer.UninstallTrigger(ctx, "public", "users_e2e") }()
 
 	// Clear any existing events
 	_, err = testContainer.Pool.Exec(ctx, `
@@ -114,7 +114,7 @@ func TestTriggerCapture_Update(t *testing.T) {
 	`)
 	require.NoError(t, err)
 	defer func() {
-		testContainer.Pool.Exec(ctx, "DROP TABLE public.users_update_test CASCADE")
+		_, _ = testContainer.Pool.Exec(ctx, "DROP TABLE public.users_update_test CASCADE")
 	}()
 
 	// Create destination and subscription for UPDATE
@@ -136,7 +136,7 @@ func TestTriggerCapture_Update(t *testing.T) {
 	installer := capture.New(testContainer.Pool)
 	err = installer.InstallTrigger(ctx, "public", "users_update_test")
 	require.NoError(t, err)
-	defer installer.UninstallTrigger(ctx, "public", "users_update_test")
+	defer func() { _ = installer.UninstallTrigger(ctx, "public", "users_update_test") }()
 
 	// Insert a row (no subscription for INSERT, so no event)
 	_, err = testContainer.Pool.Exec(ctx, `
@@ -189,7 +189,7 @@ func TestTriggerCapture_DisabledSubscription(t *testing.T) {
 	`)
 	require.NoError(t, err)
 	defer func() {
-		testContainer.Pool.Exec(ctx, "DROP TABLE public.disabled_test CASCADE")
+		_, _ = testContainer.Pool.Exec(ctx, "DROP TABLE public.disabled_test CASCADE")
 	}()
 
 	// Create a disabled subscription
@@ -211,7 +211,7 @@ func TestTriggerCapture_DisabledSubscription(t *testing.T) {
 	installer := capture.New(testContainer.Pool)
 	err = installer.InstallTrigger(ctx, "public", "disabled_test")
 	require.NoError(t, err)
-	defer installer.UninstallTrigger(ctx, "public", "disabled_test")
+	defer func() { _ = installer.UninstallTrigger(ctx, "public", "disabled_test") }()
 
 	// Insert a row - should NOT create event since subscription is disabled
 	_, err = testContainer.Pool.Exec(ctx, `

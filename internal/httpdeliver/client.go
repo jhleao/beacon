@@ -149,7 +149,7 @@ func (c *Client) Deliver(
 	defer resp.Body.Close()
 
 	// 8. Read response (limited to prevent memory exhaustion)
-	io.Copy(io.Discard, io.LimitReader(resp.Body, 64*1024))
+	_, _ = io.Copy(io.Discard, io.LimitReader(resp.Body, 64*1024))
 
 	// 9. Extract response headers
 	respHeaders := make(map[string]string)

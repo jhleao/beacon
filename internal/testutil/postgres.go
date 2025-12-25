@@ -44,13 +44,13 @@ func StartPostgres(ctx context.Context) (*PostgresContainer, error) {
 
 	host, err := container.Host(ctx)
 	if err != nil {
-		container.Terminate(ctx)
+		_ = container.Terminate(ctx)
 		return nil, fmt.Errorf("failed to get container host: %w", err)
 	}
 
 	port, err := container.MappedPort(ctx, "5432")
 	if err != nil {
-		container.Terminate(ctx)
+		_ = container.Terminate(ctx)
 		return nil, fmt.Errorf("failed to get container port: %w", err)
 	}
 
@@ -58,14 +58,14 @@ func StartPostgres(ctx context.Context) (*PostgresContainer, error) {
 
 	pool, err := db.New(ctx, dsn)
 	if err != nil {
-		container.Terminate(ctx)
+		_ = container.Terminate(ctx)
 		return nil, fmt.Errorf("failed to connect to postgres: %w", err)
 	}
 
 	// Run migrations (uses embedded migrations)
 	if err := pool.Migrate(ctx); err != nil {
 		pool.Close()
-		container.Terminate(ctx)
+		_ = container.Terminate(ctx)
 		return nil, fmt.Errorf("failed to run migrations: %w", err)
 	}
 
@@ -82,7 +82,7 @@ func (pc *PostgresContainer) Close(ctx context.Context) {
 		pc.Pool.Close()
 	}
 	if pc.Container != nil {
-		pc.Container.Terminate(ctx)
+		_ = pc.Container.Terminate(ctx)
 	}
 }
 
