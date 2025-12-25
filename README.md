@@ -90,7 +90,7 @@ subscriptions:
 
 ```bash
 curl -X POST http://localhost:8080/apply \
-  -H "Authorization: Bearer $BEACON_API_KEY" \
+  -H "Authorization: Bearer $BEACON_CONTROLPLANE_SECRET" \
   -H "Content-Type: application/yaml" \
   --data-binary @config.yaml
 ```
@@ -101,20 +101,22 @@ Beacon installs PostgreSQL triggers on your tables. When rows change, webhooks f
 
 ### Environment Variables
 
-| Variable                    | Description                           | Default        |
-| --------------------------- | ------------------------------------- | -------------- |
-| `DATABASE_URL`              | PostgreSQL connection string          | required       |
-| `BEACON_API_KEY`            | Control plane authentication          | required       |
-| `BEACON_HMAC_SECRET`        | Webhook signing secret                | optional       |
-| `BEACON_LOG_LEVEL`          | Log level (debug, info, warn, error)  | `info`         |
-| `BEACON_LOG_FORMAT`         | Log format (json, text)               | `json`         |
-| `BEACON_CONTROL_ADDR`       | Control plane listen address          | `:8080`        |
-| `BEACON_POLL_INTERVAL`      | Outbox polling interval               | `100ms`        |
-| `BEACON_BATCH_SIZE`         | Events to claim per poll              | `100`          |
-| `BEACON_WORKERS`            | Concurrent delivery workers           | `10`           |
-| `BEACON_RETENTION_HOURS`    | Retention period for delivered events | `168` (7 days) |
-| `BEACON_JANITOR_INTERVAL`   | Cleanup interval                      | `1h`           |
-| `BEACON_JANITOR_BATCH_SIZE` | Max events cleaned per cycle          | `1000`         |
+| Variable                     | Description                                                 | Default        |
+| ---------------------------- | ----------------------------------------------------------- | -------------- |
+| `DATABASE_URL`               | PostgreSQL connection string                                | required       |
+| `BEACON_CONTROLPLANE_SECRET` | Control plane authentication (Bearer token)                 | required       |
+| `BEACON_HTTP_ADDR`           | Control plane listen address                                | `:8080`        |
+| `BEACON_POLL_INTERVAL`       | Outbox polling interval                                     | `100ms`        |
+| `BEACON_BATCH_SIZE`          | Events to claim per poll                                    | `100`          |
+| `BEACON_WORKER_COUNT`        | Concurrent delivery workers                                 | `10`           |
+| `BEACON_HMAC_SECRET`         | Webhook signing secret                                      | optional       |
+| `BEACON_LOG_LEVEL`           | Log level (debug, info, warn, error)                        | `info`         |
+| `BEACON_LOG_FORMAT`          | Log format (json, text)                                     | `json`         |
+| `BEACON_MAX_PAYLOAD_BYTES`   | Max request body bytes sent to destinations                 | `1048576`      |
+| `BEACON_RETENTION_HOURS`     | Retention period for delivered events                       | `168` (7 days) |
+| `BEACON_JANITOR_INTERVAL`    | Cleanup interval                                            | `1h`           |
+| `BEACON_JANITOR_BATCH_SIZE`  | Max events cleaned per cycle                                | `1000`         |
+| `BEACON_SEED_CONFIG_PATH`    | Path to seed config to auto-apply on startup if DB is clean | optional       |
 
 ### Webhook Payload
 
