@@ -325,7 +325,13 @@ INSERT INTO beacon.outbox_events (
 
 ## Metrics
 
-Prometheus metrics exposed at `/metrics`:
+Prometheus metrics exposed at `/metrics` (authenticated):
+
+```bash
+curl -sS \
+  -H "Authorization: Bearer $BEACON_CONTROLPLANE_SECRET" \
+  http://localhost:8080/metrics | head
+```
 
 | Metric | Type | Description |
 |--------|------|-------------|

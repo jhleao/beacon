@@ -3,5 +3,6 @@ global:
 
 scrape_configs:
   - job_name: 'beacon'
+    bearer_token: 'dev-control-secret-change-in-prod'
     static_configs:
       - targets: ['host.docker.internal:8080']
